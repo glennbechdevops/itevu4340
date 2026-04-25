@@ -36,24 +36,23 @@ Your Codespace will be ready in 1-2 minutes. No local installation required!
 
 ## Architecture
 
-```
-[Web Browser]
-     |
-     | HTTP POST
-     |
-     v
-[ToxiProxy] -----> [AWS Lambda Function URL]
-                            |
-                            | DynamoDB SDK
-                            v
-                   [DynamoDB Table]
+```mermaid
+graph LR
+    A[Web Browser] -->|HTTP POST| B[ToxiProxy]
+    B -->|Proxy| C[AWS Lambda<br/>Function URL]
+    C -->|DynamoDB SDK| D[(DynamoDB Table)]
+
+    style A fill:#e1f5ff,stroke:#01579b
+    style B fill:#fff3e0,stroke:#e65100
+    style C fill:#f3e5f5,stroke:#4a148c
+    style D fill:#e8f5e9,stroke:#1b5e20
 ```
 
 The application is a simple "Chaos Clicker" where:
 - Users click a button to increment their chaos score
 - The webapp calls a Lambda function via HTTP
 - Lambda stores the score in DynamoDB
-- ToxiProxy sits between webapp and Lambda to inject network failures
+- **ToxiProxy sits between webapp and Lambda to inject network failures**
 
 ### Configure AWS Credentials
 
