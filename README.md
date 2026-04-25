@@ -68,7 +68,7 @@ aws configure
 Enter your:
 - AWS Access Key ID
 - AWS Secret Access Key
-- Default region: `us-east-1`
+- Default region: `eu-north-1`
 - Default output format: `json`
 
 Alternatively, set environment variables:
@@ -76,7 +76,7 @@ Alternatively, set environment variables:
 ```bash
 export AWS_ACCESS_KEY_ID=your_access_key
 export AWS_SECRET_ACCESS_KEY=your_secret_key
-export AWS_DEFAULT_REGION=us-east-1
+export AWS_DEFAULT_REGION=eu-north-1
 ```
 
 ## Lab Structure
@@ -161,7 +161,7 @@ terraform {
 }
 
 provider "aws" {
-  region = "us-east-1"
+  region = "eu-north-1"
 }
 
 module "coffee_chaos" {
