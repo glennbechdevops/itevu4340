@@ -1,0 +1,18 @@
+version: '3.8'
+
+services:
+  toxiproxy:
+    image: ghcr.io/shopify/toxiproxy:2.9.0
+    container_name: toxiproxy
+    ports:
+      - "8474:8474"  # Toxiproxy API
+      - "8000:8000"  # Proxy for Lambda
+    networks:
+      - chaos-net
+    command: -host=0.0.0.0 -config=/config/toxiproxy.json
+    volumes:
+      - ./toxiproxy-config.json:/config/toxiproxy.json:ro
+
+networks:
+  chaos-net:
+    driver: bridge
