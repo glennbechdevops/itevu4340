@@ -48,11 +48,7 @@ graph LR
     style D fill:#e8f5e9,stroke:#1b5e20
 ```
 
-The application is a simple "Chaos Clicker" where:
-- Users click a button to increment their chaos score
-- The webapp calls a Lambda function via HTTP
-- Lambda stores the score in DynamoDB
-- **ToxiProxy sits between webapp and Lambda to inject network failures**
+The application is **Coffee Chaos** - a premium coffee bean e-commerce store built with React and Framer Motion. The application showcases six specialty coffee varieties from around the world (Ethiopian Yirgacheffe, Colombian Supremo, Guatemalan Antigua, Kenyan AA, Sumatra Mandheling, and Costa Rican Tarrazu). Users can browse coffee products with detailed tasting notes, add items to their shopping cart with smooth animations, adjust quantities, and complete checkout. When users click checkout, the order is posted to a Lambda function URL, which stores the order data in DynamoDB. **ToxiProxy sits between the webapp and Lambda to inject network failures for chaos engineering experiments.**
 
 ### Configure AWS Credentials
 
@@ -113,18 +109,22 @@ cat lambda/main.go
 
 ### Explore the Web Application
 
-Open the webapp files in VS Code or view them in the terminal:
+The webapp is a React single-page application using Vite as the build tool and Framer Motion for animations. View the key files:
 
 ```bash
-cat webapp/index.html
-cat webapp/app.js
+cat webapp/src/App.jsx
+cat webapp/src/components/Cart.jsx
+cat webapp/src/data/products.js
 ```
 
 **Key observations:**
-- Vanilla JavaScript, no frameworks
-- Makes POST requests to Lambda function URL
-- **No retry logic or error handling** - failures show immediately
-- Displays score from DynamoDB
+- React with Framer Motion for smooth cart animations and slide-in effects
+- Six premium coffee products with emoji icons, tasting notes, origin, and roast level
+- Shopping cart with add/remove functionality and quantity controls
+- Makes POST requests to Lambda function URL on checkout
+- **No retry logic** - failures show immediately
+- Basic error handling displays error messages but doesn't retry failed requests
+- Orders are stored in DynamoDB
 
 ### Explore the Infrastructure
 
@@ -167,19 +167,19 @@ provider "aws" {
   region = "us-east-1"
 }
 
-module "chaos_clicker" {
+module "coffee_chaos" {
   source = "../infra"
 
   student_id = "YOUR_NAME_HERE"  # Replace with your name (lowercase, no spaces)
 }
 
 output "lambda_function_url" {
-  value = module.chaos_clicker.lambda_function_url
+  value = module.coffee_chaos.lambda_function_url
   description = "URL to call from webapp"
 }
 
 output "dynamodb_table_name" {
-  value = module.chaos_clicker.dynamodb_table_name
+  value = module.coffee_chaos.dynamodb_table_name
 }
 ```
 
@@ -197,7 +197,7 @@ terraform apply
 
 ### Configure the Webapp
 
-Open `webapp/app.js` in VS Code and update the Lambda function URL with the output from terraform:
+Open `webapp/src/components/Cart.jsx` in VS Code and update the Lambda function URL with the output from terraform:
 
 ```javascript
 const LAMBDA_URL = 'YOUR_FUNCTION_URL_HERE';  // From terraform output
@@ -207,27 +207,29 @@ Save the file.
 
 ### Open the Webapp in Your Browser
 
-In your Codespace terminal, start a simple HTTP server:
+Start the React development server with Vite:
 
 ```bash
 cd webapp
-python3 -m http.server 8080
+npm install  # Install dependencies (first time only)
+npm run dev
 ```
 
 VS Code will detect the port and show a notification. Click "Open in Browser" or:
 1. Click the "Ports" tab at the bottom of VS Code
-2. Find port 8080
+2. Find port 3000 (Vite dev server)
 3. Click the globe icon to open the webapp in your browser
 
-The webapp should now be accessible at a URL like: `https://[codespace-name]-8080.preview.app.github.dev`
+The webapp should now be accessible at a URL like: `https://[codespace-name]-3000.preview.app.github.dev`
 
 ### Encounter the First Failure
 
-Click the "Increment Score" button.
+Browse the coffee products and add some to your cart. Then click the "Checkout" button.
 
 **What happens?**
 - Open browser Developer Tools (F12) → Console tab
 - You'll see a CORS error: `Access-Control-Allow-Origin header is missing`
+- The checkout fails with an error message
 
 **Why does this happen?**
 - Browsers enforce same-origin policy for security
@@ -237,7 +239,7 @@ Click the "Increment Score" button.
 **Document your observation:**
 - What error message did you see?
 - How does the webapp behave?
-- What is the user experience?
+- What is the user experience when trying to complete a coffee order?
 
 This CORS error is part of the chaos - a configuration failure that's common in distributed systems. You'll address this in Part 2.
 
@@ -284,7 +286,7 @@ Note: Docker is pre-installed in your Codespace. You may need to wait a few seco
 
 ### Configure the Proxy
 
-Update `webapp/app.js` to use ToxiProxy instead of direct Lambda URL:
+Update `webapp/src/components/Cart.jsx` to use ToxiProxy instead of direct Lambda URL:
 
 ```javascript
 const LAMBDA_URL = 'http://localhost:8000';  // Through ToxiProxy
@@ -344,15 +346,15 @@ curl -X POST http://localhost:8474/proxies/chaos-proxy/toxics \
 ```
 
 **Test:**
-1. Click "Increment Score" button
-2. Observe the delay
-3. Click multiple times before first response returns
-4. Check DynamoDB for duplicate records
+1. Add coffee to your cart and click "Checkout"
+2. Observe the delay in order processing
+3. Try clicking checkout multiple times before first response returns
+4. Check DynamoDB for duplicate orders
 
 **Measure:**
-- How long does each request take?
-- Do users get frustrated and click again?
-- Are there duplicate records in the database?
+- How long does each checkout request take?
+- Do users get frustrated and click checkout again?
+- Are there duplicate orders in the database?
 - Does the UI give any feedback during the wait?
 
 ### Experiment 2: Random Failures
