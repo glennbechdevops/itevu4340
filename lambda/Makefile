@@ -4,6 +4,8 @@ BINARY_NAME=bootstrap
 LAMBDA_ZIP=function.zip
 
 build:
+	@echo "Installing dependencies..."
+	go mod tidy
 	@echo "Building Lambda function..."
 	GOOS=linux GOARCH=amd64 CGO_ENABLED=0 go build -o $(BINARY_NAME) main.go
 	@echo "Build complete: $(BINARY_NAME)"
