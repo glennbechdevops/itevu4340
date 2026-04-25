@@ -14,6 +14,26 @@ By the end of this lab, you will understand:
 - Practical resilience patterns: retries, timeouts, circuit breakers
 - How to build systems that improve from failure
 
+## Getting Started with GitHub Codespaces
+
+This lab is designed to run in GitHub Codespaces, which provides a complete development environment in your browser.
+
+### Launch Your Codespace
+
+1. Fork or clone this repository to your GitHub account
+2. Click the green "Code" button
+3. Select the "Codespaces" tab
+4. Click "Create codespace on main"
+
+GitHub will automatically set up your environment with:
+- Terraform pre-installed
+- Go toolchain for Lambda development
+- Docker for running ToxiProxy
+- AWS CLI pre-configured
+- All dependencies ready to use
+
+Your Codespace will be ready in 1-2 minutes. No local installation required!
+
 ## Architecture
 
 ```
@@ -35,14 +55,27 @@ The application is a simple "Chaos Clicker" where:
 - Lambda stores the score in DynamoDB
 - ToxiProxy sits between webapp and Lambda to inject network failures
 
-## Prerequisites
+### Configure AWS Credentials
 
-- AWS Account with credentials configured
-- Terraform installed (v1.0+)
-- Go installed (1.21+) for Lambda development
-- Docker Desktop running (for ToxiProxy)
-- Modern web browser
-- Text editor
+Once your Codespace launches, configure your AWS credentials:
+
+```bash
+aws configure
+```
+
+Enter your:
+- AWS Access Key ID
+- AWS Secret Access Key
+- Default region: `us-east-1`
+- Default output format: `json`
+
+Alternatively, set environment variables:
+
+```bash
+export AWS_ACCESS_KEY_ID=your_access_key
+export AWS_SECRET_ACCESS_KEY=your_secret_key
+export AWS_DEFAULT_REGION=us-east-1
+```
 
 ## Lab Structure
 
@@ -63,13 +96,14 @@ In Part 1, you will deploy a deliberately fragile system, run chaos experiments,
 
 ## Step 1: Familiarize with the Code
 
+The repository is cloned in `/workspaces/[repo-name]` in your Codespace. You can navigate using the VS Code file explorer or the terminal.
+
 ### Explore the Lambda Function
 
-Navigate to `lambda/` and examine `main.go`:
+Open `lambda/main.go` in the VS Code editor, or view it in the terminal:
 
 ```bash
-cd lambda
-cat main.go
+cat lambda/main.go
 ```
 
 **Key observations:**
@@ -80,12 +114,11 @@ cat main.go
 
 ### Explore the Web Application
 
-Navigate to `webapp/` and examine the code:
+Open the webapp files in VS Code or view them in the terminal:
 
 ```bash
-cd ../webapp
-cat index.html
-cat app.js
+cat webapp/index.html
+cat webapp/app.js
 ```
 
 **Key observations:**
@@ -96,13 +129,12 @@ cat app.js
 
 ### Explore the Infrastructure
 
-Navigate to `infra/` and examine the Terraform code:
+Open the Terraform files in VS Code or view them in the terminal:
 
 ```bash
-cd ../infra
-cat main.tf
-cat variables.tf
-cat outputs.tf
+cat infra/main.tf
+cat infra/variables.tf
+cat infra/outputs.tf
 ```
 
 **Key observations:**
@@ -113,10 +145,9 @@ cat outputs.tf
 
 ## Step 2: Deploy Your Infrastructure
 
-Create a deployment directory for your instance:
+From your Codespace terminal, create a deployment directory:
 
 ```bash
-cd /Users/glennbech/dev/presenter/itevu4340
 mkdir -p my-deployment
 cd my-deployment
 ```
@@ -167,20 +198,29 @@ terraform apply
 
 ### Configure the Webapp
 
-Open `webapp/app.js` and update the Lambda function URL:
+Open `webapp/app.js` in VS Code and update the Lambda function URL with the output from terraform:
 
 ```javascript
 const LAMBDA_URL = 'YOUR_FUNCTION_URL_HERE';  // From terraform output
 ```
 
-### Open the Webapp
+Save the file.
 
-Simply open `webapp/index.html` in your browser:
+### Open the Webapp in Your Browser
+
+In your Codespace terminal, start a simple HTTP server:
 
 ```bash
-open webapp/index.html  # macOS
-# or just double-click index.html
+cd webapp
+python3 -m http.server 8080
 ```
+
+VS Code will detect the port and show a notification. Click "Open in Browser" or:
+1. Click the "Ports" tab at the bottom of VS Code
+2. Find port 8080
+3. Click the globe icon to open the webapp in your browser
+
+The webapp should now be accessible at a URL like: `https://[codespace-name]-8080.preview.app.github.dev`
 
 ### Encounter the First Failure
 
@@ -230,6 +270,8 @@ ToxiProxy is a proxy that lets you inject network failures between your webapp a
 
 ### Start ToxiProxy
 
+From your Codespace terminal:
+
 ```bash
 cd webapp
 docker-compose up -d
@@ -238,6 +280,8 @@ docker-compose up -d
 This starts:
 - ToxiProxy server on port 8474 (control API)
 - Proxy listening on port 8000 (forwards to Lambda)
+
+Note: Docker is pre-installed in your Codespace. You may need to wait a few seconds for the Docker daemon to start if you just created the Codespace.
 
 ### Configure the Proxy
 
@@ -412,20 +456,32 @@ For reference implementations, see `solutions/webapp-resilient/`
 
 ## Cleanup
 
+When you're done with the lab, clean up your resources:
 
-When you're done, destroy the infrastructure to avoid charges:
+### Destroy AWS Infrastructure
+
+From the terminal in your Codespace:
 
 ```bash
 cd my-deployment
 terraform destroy
 ```
 
-Stop ToxiProxy:
+### Stop ToxiProxy
 
 ```bash
 cd ../webapp
 docker-compose down
 ```
+
+### Delete Your Codespace
+
+1. Go to https://github.com/codespaces
+2. Find your Codespace for this repository
+3. Click the three dots menu
+4. Select "Delete"
+
+This ensures you don't accumulate storage charges for the Codespace.
 
 ## Conclusion
 
