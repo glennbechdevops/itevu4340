@@ -1,7 +1,10 @@
-.PHONY: build clean deploy
+.PHONY: all build clean package
 
 BINARY_NAME=bootstrap
 LAMBDA_ZIP=function.zip
+
+# Default target creates the deployment package
+all: package
 
 build:
 	@echo "Installing dependencies..."
@@ -19,7 +22,4 @@ package: build
 	@echo "Creating deployment package..."
 	zip $(LAMBDA_ZIP) $(BINARY_NAME)
 	@echo "Package created: $(LAMBDA_ZIP)"
-
-deploy: package
-	@echo "Deploy the function using Terraform from the infra directory"
-	@echo "The function.zip file is ready for deployment"
+	@echo "Ready for Terraform deployment"
