@@ -2,7 +2,9 @@
 
 ## Overview
 
-This hands-on lab teaches chaos engineering principles through practical experimentation. You will deploy a simple web application with a serverless backend, intentionally inject failures using ToxiProxy, observe how the system degrades, and then implement resilience patterns to make it antifragile.
+This hands-on lab teaches chaos engineering principles through practical experimentation with a real-world web application. You will deploy **Coffee Chaos** - a premium coffee bean e-commerce store - with a serverless backend, intentionally inject failures using ToxiProxy, observe how the system degrades, and then implement resilience patterns to make it antifragile.
+
+Coffee Chaos is a React-based single-page application featuring six specialty coffee varieties from around the world: Ethiopian Yirgacheffe, Colombian Supremo, Guatemalan Antigua, Kenyan AA, Sumatra Mandheling, and Costa Rican Tarrazu. Users can browse products with detailed tasting notes, add items to their cart with smooth Framer Motion animations, adjust quantities, and complete checkout. Orders are posted to an AWS Lambda function URL and stored in DynamoDB.
 
 This lab is divided into two parts:
 - **Part 1:** Deploy the system, run chaos experiments, observe failures
@@ -48,7 +50,12 @@ graph LR
     style D fill:#e8f5e9,stroke:#1b5e20
 ```
 
-The application is **Coffee Chaos** - a premium coffee bean e-commerce store built with React and Framer Motion. The application showcases six specialty coffee varieties from around the world (Ethiopian Yirgacheffe, Colombian Supremo, Guatemalan Antigua, Kenyan AA, Sumatra Mandheling, and Costa Rican Tarrazu). Users can browse coffee products with detailed tasting notes, add items to their shopping cart with smooth animations, adjust quantities, and complete checkout. When users click checkout, the order is posted to a Lambda function URL, which stores the order data in DynamoDB. **ToxiProxy sits between the webapp and Lambda to inject network failures for chaos engineering experiments.**
+**How it works:**
+- Users browse coffee products and add them to their shopping cart
+- The React webapp uses Framer Motion for smooth animations
+- When users click checkout, orders are posted via HTTP to a Lambda function
+- Lambda stores order data in DynamoDB
+- **ToxiProxy sits between the webapp and Lambda to inject network failures**
 
 ### Configure AWS Credentials
 
@@ -104,12 +111,11 @@ cat lambda/main.go
 **Key observations:**
 - The handler accepts POST requests with JSON payload
 - It stores data in DynamoDB with `student_id` as partition key
-- **Notice: No CORS headers are set** - this is intentional
 - Simple error handling with basic logging
 
 ### Explore the Web Application
 
-The webapp is a React single-page application using Vite as the build tool and Framer Motion for animations. View the key files:
+The webapp is a React single-page application built with Vite and Framer Motion. View the key files:
 
 ```bash
 cat webapp/src/App.jsx
@@ -118,13 +124,12 @@ cat webapp/src/data/products.js
 ```
 
 **Key observations:**
-- React with Framer Motion for smooth cart animations and slide-in effects
+- React with Vite build tool and Framer Motion animations
 - Six premium coffee products with emoji icons, tasting notes, origin, and roast level
 - Shopping cart with add/remove functionality and quantity controls
 - Makes POST requests to Lambda function URL on checkout
 - **No retry logic** - failures show immediately
 - Basic error handling displays error messages but doesn't retry failed requests
-- Orders are stored in DynamoDB
 
 ### Explore the Infrastructure
 
@@ -217,31 +222,33 @@ npm run dev
 
 VS Code will detect the port and show a notification. Click "Open in Browser" or:
 1. Click the "Ports" tab at the bottom of VS Code
-2. Find port 3000 (Vite dev server)
+2. Find port 5173 (Vite dev server)
 3. Click the globe icon to open the webapp in your browser
 
-The webapp should now be accessible at a URL like: `https://[codespace-name]-3000.preview.app.github.dev`
+The webapp should now be accessible at a URL like: `https://[codespace-name]-5173.preview.app.github.dev`
 
-### Encounter the First Failure
+### Test Normal Operation
 
-Browse the coffee products and add some to your cart. Then click the "Checkout" button.
+1. Browse the six specialty coffee products
+2. Add items to your cart (observe the smooth animations)
+3. Adjust quantities using the + and - buttons
+4. Click the "Checkout" button
 
-**What happens?**
-- Open browser Developer Tools (F12) → Console tab
-- You'll see a CORS error: `Access-Control-Allow-Origin header is missing`
-- The checkout fails with an error message
+**What should happen:**
+- The order is sent to Lambda via HTTP POST
+- Lambda stores the order in DynamoDB
+- You'll see a success message
+- The cart clears automatically
 
-**Why does this happen?**
-- Browsers enforce same-origin policy for security
-- The Lambda function doesn't send CORS headers
-- This is our first chaos element - a configuration failure
+If you see errors, check:
+- Lambda URL is configured correctly in `Cart.jsx`
+- AWS credentials are valid
+- DynamoDB table was created successfully
 
 **Document your observation:**
-- What error message did you see?
-- How does the webapp behave?
-- What is the user experience when trying to complete a coffee order?
-
-This CORS error is part of the chaos - a configuration failure that's common in distributed systems. You'll address this in Part 2.
+- How fast is the checkout process?
+- What feedback does the UI provide?
+- How responsive does the application feel?
 
 ## Step 4: Hypothesize About Network Failures
 
@@ -251,7 +258,7 @@ Before injecting chaos, make predictions using the scientific method.
 
 1. **What will happen when we add 2000ms latency?**
    - How will the UI respond?
-   - Will users click multiple times?
+   - Will users click checkout multiple times?
    - What will happen to DynamoDB (duplicate records)?
 
 2. **What will happen when we add 50% packet loss?**
@@ -261,7 +268,7 @@ Before injecting chaos, make predictions using the scientific method.
 
 3. **What will happen when we add random timeouts?**
    - Will some requests succeed?
-   - How will users know if their click worked?
+   - How will users know if their order worked?
 
 **Save your hypotheses** - you'll compare them to actual results.
 
@@ -368,14 +375,14 @@ curl -X POST http://localhost:8474/proxies/chaos-proxy/toxics \
 ```
 
 **Test:**
-1. Click button multiple times
+1. Click checkout multiple times
 2. Some requests will timeout
 3. Others will succeed
 
 **Measure:**
 - What is the failure rate?
 - How does the UI show failures?
-- Can users tell if their click worked?
+- Can users tell if their order worked?
 
 ### Experiment 3: Limited Bandwidth
 
@@ -413,20 +420,19 @@ Compare your hypothesis to actual observations:
    - Long waits with no feedback?
    - Silent failures?
    - Duplicate actions?
-   - CORS errors?
 
 2. **What resilience patterns would help?**
    - Retries for transient failures?
    - Timeouts to fail fast?
    - Optimistic UI updates?
    - Circuit breaker to prevent cascading failures?
-   - CORS configuration?
+   - Loading indicators and progress feedback?
 
 3. **What should the steady state be?**
    - Response time < 500ms for 99% of requests?
    - No duplicate records?
    - Clear error messages?
-   - Successful CORS handling?
+   - Graceful degradation under load?
 
 **Document your findings:**
 
@@ -444,11 +450,11 @@ Save your findings - you'll implement improvements in Part 2.
 
 Part 2 instructions will be provided separately. In Part 2, you will:
 
-1. Fix the CORS configuration issue
-2. Implement request timeouts
-3. Add retry logic with exponential backoff
-4. Implement a circuit breaker pattern
-5. Add loading states and error messages
+1. Implement request timeouts
+2. Add retry logic with exponential backoff
+3. Implement a circuit breaker pattern
+4. Add loading states and error messages
+5. Prevent duplicate submissions with debouncing
 6. Validate improvements under chaos
 
 For reference implementations, see `solutions/webapp-resilient/`
@@ -509,7 +515,7 @@ You've completed a full chaos engineering cycle:
 
 1. **Add CloudWatch Alarms** - Alert when Lambda errors exceed threshold
 2. **Implement Request Deduplication** - Use idempotency keys
-3. **Add Caching** - Store scores locally, sync periodically
+3. **Add Caching** - Store orders locally, sync periodically
 4. **Multi-Region** - Deploy to two regions for higher availability
 5. **Chaos in Production** - Gradually roll out chaos to real users (with safeguards!)
 
