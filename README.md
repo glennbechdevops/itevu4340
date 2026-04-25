@@ -139,11 +139,30 @@ Open the Terraform files in VS Code:
 - Lambda function with Function URL enabled
 - IAM role with DynamoDB permissions
 
-## Step 2: Deploy Your Infrastructure
+## Step 2: Build the Lambda Function
+
+Before deploying with Terraform, you need to build the Lambda deployment package.
+
+From your Codespace terminal:
+
+```bash
+cd lambda
+make
+```
+
+This will:
+1. Install Go dependencies with `go mod tidy`
+2. Build the Lambda binary for Linux
+3. Create `function.zip` for deployment
+
+You should see output confirming the package was created.
+
+## Step 3: Deploy Your Infrastructure
 
 From your Codespace terminal, create a deployment directory:
 
 ```bash
+cd ..
 mkdir -p my-deployment
 cd my-deployment
 ```
@@ -190,7 +209,7 @@ terraform apply
 
 **Save the outputs** - you'll need the `lambda_function_url` for the webapp.
 
-## Step 3: Test the Application (Without Chaos)
+## Step 4: Test the Application (Without Chaos)
 
 ### Configure the Webapp
 
@@ -242,7 +261,7 @@ If you see errors, check:
 - What feedback does the UI provide?
 - How responsive does the application feel?
 
-## Step 4: Hypothesize About Network Failures
+## Step 5: Hypothesize About Network Failures
 
 Before injecting chaos, make predictions using the scientific method.
 
@@ -264,7 +283,7 @@ Before injecting chaos, make predictions using the scientific method.
 
 **Save your hypotheses** - you'll compare them to actual results.
 
-## Step 5: Configure ToxiProxy
+## Step 6: Configure ToxiProxy
 
 ToxiProxy is a proxy that lets you inject network failures between your webapp and Lambda.
 
@@ -332,7 +351,7 @@ ToxiProxy supports many failure modes:
 {"type": "slicer", "attributes": {"average_size": 64, "size_variation": 32, "delay": 10}}
 ```
 
-## Step 6: Run Experiments and Observe
+## Step 7: Run Experiments and Observe
 
 ### Experiment 1: High Latency
 
@@ -402,7 +421,7 @@ Remove all toxics to reset:
 curl -X DELETE http://localhost:8474/proxies/chaos-proxy/toxics/high-latency
 ```
 
-## Step 7: Reflect and Document Your Findings
+## Step 8: Reflect and Document Your Findings
 
 Compare your hypothesis to actual observations:
 
