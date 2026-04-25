@@ -98,15 +98,11 @@ In Part 1, you will deploy a deliberately fragile system, run chaos experiments,
 
 ## Step 1: Familiarize with the Code
 
-The repository is cloned in `/workspaces/[repo-name]` in your Codespace. You can navigate using the VS Code file explorer or the terminal.
+Explore the repository structure using the VS Code file explorer.
 
 ### Explore the Lambda Function
 
-Open `lambda/main.go` in the VS Code editor, or view it in the terminal:
-
-```bash
-cat lambda/main.go
-```
+Open `lambda/main.go` in the VS Code editor.
 
 **Key observations:**
 - The handler accepts POST requests with JSON payload
@@ -115,13 +111,11 @@ cat lambda/main.go
 
 ### Explore the Web Application
 
-The webapp is a React single-page application built with Vite and Framer Motion. View the key files:
+The webapp is a React single-page application built with Vite and Framer Motion. Open these key files in VS Code:
 
-```bash
-cat webapp/src/App.jsx
-cat webapp/src/components/Cart.jsx
-cat webapp/src/data/products.js
-```
+- `webapp/src/App.jsx` - Main application component
+- `webapp/src/components/Cart.jsx` - Shopping cart with checkout logic
+- `webapp/src/data/products.js` - Six specialty coffee products
 
 **Key observations:**
 - React with Vite build tool and Framer Motion animations
@@ -133,13 +127,11 @@ cat webapp/src/data/products.js
 
 ### Explore the Infrastructure
 
-Open the Terraform files in VS Code or view them in the terminal:
+Open the Terraform files in VS Code:
 
-```bash
-cat infra/main.tf
-cat infra/variables.tf
-cat infra/outputs.tf
-```
+- `infra/main.tf` - Main infrastructure definition
+- `infra/variables.tf` - Input variables
+- `infra/outputs.tf` - Output values
 
 **Key observations:**
 - Terraform module that requires `student_id` variable
