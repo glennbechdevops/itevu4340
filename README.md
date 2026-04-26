@@ -187,13 +187,6 @@ terraform {
       version = "~> 5.0"
     }
   }
-
-  # Remote state backend to avoid conflicts between students
-  backend "s3" {
-    bucket = "your-terraform-state-bucket"  # Provided by instructor
-    key    = "students/YOUR_NAME_HERE/terraform.tfstate"  # Use your student_id here
-    region = "eu-north-1"
-  }
 }
 
 provider "aws" {
@@ -211,8 +204,6 @@ output "dynamodb_table_name" {
   description = "DynamoDB table for storing orders"
 }
 ```
-
-**Note:** If you're working alone or your instructor hasn't provided a shared state bucket, you can omit the `backend "s3"` block and use local state instead.
 
 Deploy the infrastructure:
 
@@ -382,9 +373,16 @@ curl -X DELETE http://localhost:8474/proxies/chaos-proxy/toxics/my-toxic-name
 curl http://localhost:8474/proxies/chaos-proxy
 ```
 
+**Troubleshooting:** If you get a 404 error, the proxy might not be loaded. Restart ToxiProxy:
+```bash
+docker-compose restart toxiproxy
+# Wait a few seconds, then verify
+curl http://localhost:8474/proxies
+```
+
 ### Available Toxic Types
 
-ToxiProxy supports many failure modes you can inject:
+ToxiProxy supports many failure modes you can inject beyond the latency example we've seen:
 
 **Latency:** Add delay to requests
 ```bash
@@ -421,143 +419,208 @@ curl -X POST http://localhost:8474/proxies/chaos-proxy/toxics \
 - `size_variation`: Variation in packet size
 - `delay`: Delay between packets in milliseconds
 
-## Step 7: Run the Chaos Experiment - The Timeout Cascade
+## Step 7: Test the Enterprise Architecture Decision
 
 ### The Scenario
 
-Your Go microservice takes **2-3 seconds** to process each order because it calls three external services sequentially:
+Your enterprise architect just announced a new mandate:
 
-- **Credit card processing**: ~500-900ms
-- **SAP inventory update**: ~600-900ms
-- **DHL shipping creation**: ~500-700ms
-- **Total**: 2-3 seconds per order
+> **"All API requests must complete within 5 seconds or they will be terminated by our infrastructure."**
 
-Many network components (load balancers, CDNs, API gateways) have default **3-second timeouts**. This creates a dangerous situation where your service *usually* finishes in time... but not always.
+**The reasoning:**
+- During peak hours (Black Friday, holiday sales), slow requests pile up
+- They consume connection pools, memory, and database connections
+- This causes cascading failures that crash upstream systems
+- The architect's solution: "Kill anything over 5 seconds to protect the infrastructure"
 
-### The Hypothesis
+**Your challenge:** Test if this 5-second timeout is safe for your coffee ordering system.
 
-**Write down your prediction before running the experiment:**
+### Current Service Behavior
 
-*"If we add a 3-second timeout to ToxiProxy (simulating a load balancer timeout), and the service naturally takes 2-3 seconds to process orders, what will happen?"*
+Your Go microservice calls three external services sequentially:
 
-Consider:
-- Will all orders succeed? All fail? Some of each?
-- If some fail, can users tell which ones?
-- What happens to orders that the frontend thinks failed?
-- Will users retry failed orders?
+- **Credit card processing**: ~500-900ms (but can be 2-3x slower during peak)
+- **SAP inventory update**: ~600-900ms (but can be 2-3x slower during peak)
+- **DHL shipping creation**: ~500-700ms (but can be 2-3x slower during peak)
 
-### Setup the Experiment
+**Normal conditions:** 2-3 seconds total ✅
+**Peak load conditions:** Could be 5-9 seconds total ⚠️
 
-**Step 1: Clear any existing toxics** (start with a clean slate):
+### The Experiments
 
-First, list all active toxics to see what needs to be removed:
+You'll run three experiments to test the impact of the 5-second timeout under different load conditions.
 
+**Before you start:** Write down your hypothesis for each experiment.
+
+---
+
+### Experiment 1: Baseline - Normal Day (No Chaos)
+
+**Hypothesis:** *What do you expect will happen on a normal day with no external service delays?*
+
+**Setup:** No toxics - test the service in its natural state
+
+**Steps:**
+1. Make sure all toxics are cleared:
+   ```bash
+   curl http://localhost:8474/proxies/chaos-proxy/toxics
+   # Should return: []
+   ```
+
+2. Place 3-5 orders and observe:
+   - Success rate
+   - Response times (check browser Network tab)
+   - Backend logs: `docker logs -f chaos-coffee-service`
+
+**Expected Result:** All orders should succeed in 2-3 seconds.
+
+---
+
+### Experiment 2: Busy Hour - External Services Under Load
+
+**Hypothesis:** *What happens when external services slow down during a busy hour? Will the 5-second timeout cause problems?*
+
+**Scenario:** Credit card processors and SAP are slower than usual (1.5x delay)
+
+**Setup:**
 ```bash
-curl http://localhost:8474/proxies/chaos-proxy/toxics
-```
-
-Remove each toxic by name (the name appears at the end of the URL):
-
-```bash
-# Example: if you see toxics named "latency", "slow-bandwidth", etc.
-curl -X DELETE http://localhost:8474/proxies/chaos-proxy/toxics/latency
-curl -X DELETE http://localhost:8474/proxies/chaos-proxy/toxics/slow-bandwidth
-curl -X DELETE http://localhost:8474/proxies/chaos-proxy/toxics/timeoit
-```
-
-Verify all toxics are removed:
-
-```bash
-curl http://localhost:8474/proxies/chaos-proxy/toxics
-# Should return: []
-```
-
-**Step 2: Add a 3-second timeout toxic** (simulating strict infrastructure timeout):
-
-```bash
+# Add 1500ms latency (simulates external services under load)
 curl -X POST http://localhost:8474/proxies/chaos-proxy/toxics \
   -H 'Content-Type: application/json' \
   -d '{
-    "name": "infrastructure-timeout",
+    "name": "peak-load-latency",
+    "type": "latency",
+    "attributes": {"latency": 1500}
+  }'
+
+# Add 5-second timeout (enterprise architecture rule)
+curl -X POST http://localhost:8474/proxies/chaos-proxy/toxics \
+  -H 'Content-Type: application/json' \
+  -d '{
+    "name": "enterprise-timeout",
     "type": "timeout",
-    "attributes": {"timeout": 3000}
+    "attributes": {"timeout": 5000}
   }'
 ```
 
-Verify it's active:
+**Service processing time now:** 2-3 seconds + 1.5 seconds = **3.5-4.5 seconds**
 
+**Steps:**
+1. Place 10 orders (do this multiple times)
+2. Track results in a table:
+
+| Attempt | Frontend Result | Actual Time | Saved to DB? |
+|---------|----------------|-------------|--------------|
+| 1       | Success/Error  | ~X sec     | Yes/No       |
+| 2       | Success/Error  | ~X sec     | Yes/No       |
+| ...     | ...            | ...         | ...          |
+
+3. Check DynamoDB after:
+   ```bash
+   aws dynamodb scan --table-name chaos-coffee-${STUDENT_ID} \
+     --query 'Count'
+   ```
+
+**What to observe:**
+- Do all orders succeed?
+- Are any orders close to the 5-second limit?
+- What happens to orders that time out?
+
+**Clean up:**
 ```bash
-curl http://localhost:8474/proxies/chaos-proxy/toxics
+curl -X DELETE http://localhost:8474/proxies/chaos-proxy/toxics/peak-load-latency
+curl -X DELETE http://localhost:8474/proxies/chaos-proxy/toxics/enterprise-timeout
 ```
 
-### Run the Experiment
+---
 
-**Test checkout 5-10 times and document each attempt:**
+### Experiment 3: Black Friday - External Services Very Slow
 
-1. Add coffee to your cart
-2. Click "Checkout"
-3. Note the result (success or error message)
-4. Repeat
+**Hypothesis:** *What happens during peak load (Black Friday) when external services are very slow? Will many orders fail?*
 
-**Create a simple table to track results:**
+**Scenario:** External services are under heavy load (3x normal delay)
 
-| Attempt | Frontend Result | Time to Response |
-|---------|----------------|------------------|
-| 1       | Success / Error | ~X seconds      |
-| 2       | Success / Error | ~X seconds      |
-| 3       | Success / Error | ~X seconds      |
-| ...     | ...            | ...             |
-
-### What to Observe
-
-**1. Check the browser console** (F12 → Console tab):
-- Do you see 500 errors?
-- What error message is displayed?
-
-**2. Check the microservice logs**:
+**Setup:**
 ```bash
-docker logs -f chaos-coffee-service
-```
-- Did the service finish processing even when frontend showed error?
-- How long did each order take to process?
+# Add 3000ms latency (simulates heavy external load)
+curl -X POST http://localhost:8474/proxies/chaos-proxy/toxics \
+  -H 'Content-Type: application/json' \
+  -d '{
+    "name": "black-friday-latency",
+    "type": "latency",
+    "attributes": {"latency": 3000}
+  }'
 
-**3. Check DynamoDB for data consistency**:
+# Add 5-second timeout (enterprise rule)
+curl -X POST http://localhost:8474/proxies/chaos-proxy/toxics \
+  -H 'Content-Type: application/json' \
+  -d '{
+    "name": "enterprise-timeout",
+    "type": "timeout",
+    "attributes": {"timeout": 5000}
+  }'
+```
+
+**Service processing time now:** 2-3 seconds + 3 seconds = **5-6 seconds**
+
+**Steps:**
+1. Place 10 orders
+2. Observe the failure rate
+3. Check backend logs - did the service finish processing even when frontend timed out?
+   ```bash
+   docker logs chaos-coffee-service --tail 30
+   ```
+4. Check DynamoDB - how many orders were actually saved?
+
+**Critical Discovery:**
+You'll likely find that:
+- Frontend shows "Order failed: HTTP error! status: 500"
+- But the backend successfully saved many orders to DynamoDB
+- Users think their order failed and might try again
+- **Result:** Duplicate orders and confused customers
+
+**Clean up:**
 ```bash
-aws dynamodb scan --table-name chaos-coffee-${STUDENT_ID} \
-  --query 'Items[*].[order_id.S, timestamp.S]' \
-  --output table
+curl -X DELETE http://localhost:8474/proxies/chaos-proxy/toxics/black-friday-latency
+curl -X DELETE http://localhost:8474/proxies/chaos-proxy/toxics/enterprise-timeout
 ```
-- How many orders are in the database?
-- Are there orders that the frontend reported as "failed"?
 
-### Expected Discovery
+---
 
-You'll likely discover a **critical production issue**:
+### Reflection and Discussion
 
-- **Some orders succeed** (when processing takes <3 seconds)
-- **Some orders fail** (when processing takes ≥3 seconds)
-- **Inconsistent behavior**: "It worked last time, why not now?"
-- **Data inconsistency**: Frontend shows error, but order was saved to DynamoDB
-- **User confusion**: Users retry "failed" orders, creating duplicates
+After running all three experiments, discuss these questions with your team:
 
-### The Problem: Timeout Cascade
+**1. Was the enterprise architect right?**
+- Is the 5-second timeout protecting the infrastructure?
+- What's the cost of this protection (failed orders)?
+- What would happen without any timeout?
 
-This is a real-world issue called the **"timeout cascade"**:
+**2. What's the right timeout value?**
+- Should it be 5 seconds? 7 seconds? 10 seconds?
+- How do you decide?
+- Should different endpoints have different timeouts?
 
-1. Service processing time varies (2-3 seconds)
-2. Infrastructure timeout is barely long enough (3 seconds)
-3. Some requests succeed, some fail (**intermittent failures are hardest to debug**)
-4. Frontend can't distinguish timeout from actual failure
-5. Users retry, creating duplicate orders
-6. No one is happy
+**3. What are the alternatives?**
+- **Optimize the service**: Can you make external calls faster or parallel?
+- **Async processing**: Accept the order immediately, process it later
+- **Circuit breaker**: Stop calling slow external services
+- **Idempotency**: Allow safe retries without creating duplicates
+- **Better monitoring**: Alert when processing time approaches timeout
 
-### Clean Up
+**4. The real problem**
+The timeout revealed a deeper issue:
+- Your service depends on synchronous calls to three external systems
+- You have no control over their performance
+- Their slowdown becomes your problem
+- **This is tight coupling** - the hallmark of fragile systems
 
-Remove the timeout toxic when done:
-
-```bash
-curl -X DELETE http://localhost:8474/proxies/chaos-proxy/toxics/infrastructure-timeout
-```
+**Document your findings:**
+Create a brief report with:
+- Your hypothesis for each experiment
+- Actual results (success/failure rates)
+- Screenshots or logs showing the problem
+- Recommendations for the enterprise architect
 
 ## Step 8: Reflect and Document Your Findings
 
