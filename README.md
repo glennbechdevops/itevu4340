@@ -597,14 +597,30 @@ curl -X POST http://localhost:8474/proxies/chaos-proxy/toxics \
    ```
 4. Check DynamoDB - how many orders were actually saved?
 
-**Critical Discovery:**
-You'll likely find that:
-- Frontend shows "Order timed out - request took too long"
-- But the backend successfully saved many orders to DynamoDB
-- Users think their order failed and might try again
-- **Result:** Duplicate orders and confused customers
+**Investigation Questions:**
 
-**The problem:** The 5-second timeout kills the request from the frontend's perspective, but the backend continues processing and saves the order. This creates data inconsistency.
+When orders timeout in the frontend, what actually happens on the backend?
+
+1. Check the backend logs:
+   ```bash
+   docker logs chaos-coffee-service --tail 50
+   ```
+   - Do you see "Order processed successfully" messages?
+   - How many orders were processed vs how many the frontend reported as failed?
+
+2. Count orders in DynamoDB:
+   ```bash
+   aws dynamodb scan --table-name chaos-coffee-$STUDENT_ID --query 'Count'
+   ```
+   - Does this match the number of successful responses in the frontend?
+   - Are there more orders than you expected?
+
+3. **Critical question:** If the frontend times out after 5 seconds, does the backend stop processing the order or does it continue?
+
+**Document your findings:**
+- What is the data consistency problem here?
+- Why might users submit duplicate orders?
+- What happens if a user sees "timeout" and clicks checkout again?
 
 **Clean up:**
 ```bash
