@@ -421,7 +421,7 @@ curl -X POST http://localhost:8474/proxies/chaos-proxy/toxics \
 
 ### Controlling Toxic Probability with `toxicity`
 
-By default, toxics apply to 100% of requests. You can control the probability using the `toxicity` parameter (value between 0 and 1):
+All toxic types support an optional `toxicity` parameter (value between 0 and 1) that controls what percentage of requests are affected. By default, toxics apply to 100% of requests (`toxicity: 1.0`).
 
 ```bash
 # Apply timeout to only 30% of requests
@@ -435,11 +435,13 @@ curl -X POST http://localhost:8474/proxies/chaos-proxy/toxics \
   }'
 ```
 
-- `toxicity: 1.0` = 100% of requests affected (default)
+**Toxicity values:**
+- `toxicity: 1.0` = 100% of requests affected (default if omitted)
 - `toxicity: 0.3` = 30% of requests affected
 - `toxicity: 0.5` = 50% of requests affected
+- `toxicity: 0.1` = 10% of requests affected
 
-This is useful for simulating intermittent failures rather than complete outages.
+You can add the `toxicity` parameter to any toxic type (latency, timeout, bandwidth, slicer) to simulate intermittent failures rather than complete outages.
 
 ## Step 7: Test the Enterprise Architecture Decision
 
