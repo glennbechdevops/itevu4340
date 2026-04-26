@@ -287,7 +287,7 @@ Before injecting chaos, make predictions using the scientific method.
 
 1. **What will happen when we add 2000ms latency?**
    - How will the UI respond?
-   - Will users click checkout multiple times?
+   - Will users click checkout multiple times? How does the UI protect against that already?
    - What will happen to DynamoDB (duplicate records)?
 
 2. **What will happen when we add 50% packet loss?**
