@@ -1115,14 +1115,14 @@ I want to re-architect my coffee shop application for better robustness and deco
 
 Current architecture:
 - React frontend with client-side cart state
-- Direct synchronous calls to AWS Lambda Function URL
-- Lambda writes to DynamoDB immediately
-- No CORS headers (intentionally broken for learning)
+- Direct synchronous calls to Go microservice
+- Microservice writes to DynamoDB immediately
+- Running in Docker containers with ToxiProxy for chaos testing
 
 Problems I want to solve:
-1. Frontend is tightly coupled to Lambda - failures affect user experience immediately
-2. No way to retry failed orders
-3. Orders are lost if Lambda fails after accepting the request
+1. Frontend is tightly coupled to microservice - failures affect user experience immediately
+2. No way to retry failed orders automatically
+3. Orders might be lost if microservice fails after accepting the request
 4. No visibility into order status
 5. Difficult to test and debug distributed failures
 
@@ -1134,8 +1134,10 @@ Goals for re-architecture:
 - Maintain simplicity (this is a learning project, not production)
 
 Technologies I'm already using:
-- AWS Lambda, DynamoDB, S3, CloudFront
+- Go microservice in Docker
+- DynamoDB for data storage
 - React frontend
+- ToxiProxy for chaos testing
 - Terraform for IaC
 
 Please suggest an architecture that achieves these goals. Explain the trade-offs and what components I'd need to add.
@@ -1174,8 +1176,8 @@ Think about and be ready to discuss:
 I want to improve the robustness of my coffee shop application. Before we write any code, let's create a plan.
 
 Current situation:
-- Frontend makes direct synchronous calls to Lambda
-- Lambda writes to DynamoDB immediately
+- Frontend makes direct synchronous calls to Go microservice
+- Microservice writes to DynamoDB immediately
 - No retry logic or error recovery
 
 I want to explore architectural options that:
