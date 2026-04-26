@@ -62,7 +62,8 @@ graph LR
 - The Go microservice processes orders and stores them in DynamoDB (port 8080)
 - All services run in Docker containers orchestrated by Docker Compose
 
-**About ToxiProxy:**
+### About ToxiProxy
+
 ToxiProxy was created by Shopify to simulate network conditions and test application resilience in distributed systems. It acts as a transparent TCP proxy that can inject various network failures (latency, timeouts, bandwidth limits) on demand through a simple HTTP API. Originally built for Shopify's microservices infrastructure, it's now widely used across the industry to test how applications behave under adverse network conditions. Learn more at the [ToxiProxy GitHub repository](https://github.com/Shopify/toxiproxy).
 
 ### Docker Compose Setup
@@ -377,7 +378,7 @@ ToxiProxy provides an HTTP API on port 8474 for managing network failures.
 
 **List all active toxics:**
 ```bash
-curl http://localhost:8474/proxies/chaos-proxy/toxics
+curl http://localhost:8474/proxies/chaos-proxy/toxics | jq
 ```
 
 **Add a toxic:**
@@ -398,14 +399,14 @@ curl -X DELETE http://localhost:8474/proxies/chaos-proxy/toxics/my-toxic-name
 
 **Check proxy status:**
 ```bash
-curl http://localhost:8474/proxies/chaos-proxy
+curl http://localhost:8474/proxies/chaos-proxy | jq
 ```
 
 **Troubleshooting:** If you get a 404 error, the proxy might not be loaded. Restart ToxiProxy:
 ```bash
 docker-compose restart toxiproxy
 # Wait a few seconds, then verify
-curl http://localhost:8474/proxies
+curl http://localhost:8474/proxies | jq
 ```
 
 ### Available Toxic Types
@@ -533,7 +534,7 @@ You'll run three experiments to test the impact of the 5-second timeout under di
 **Steps:**
 1. Make sure all toxics are cleared:
    ```bash
-   curl http://localhost:8474/proxies/chaos-proxy/toxics
+   curl http://localhost:8474/proxies/chaos-proxy/toxics | jq
    # Should return: []
    ```
 
