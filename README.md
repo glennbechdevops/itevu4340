@@ -701,57 +701,13 @@ If the request times out and you retry with the **same key**, Stripe returns the
 3. **Enables automatic retries**: Frontend can retry without fear of duplicates
 4. **Production-ready**: This is how real systems handle distributed transactions
 
-## Implementation Overview
+## Key Concepts
 
-You'll implement TWO interdependent parts:
+**Idempotency Key:** A unique identifier (UUID) generated once per user action. When included in requests, it allows the backend to detect and prevent duplicate operations.
 
-### Part A: Idempotency Keys (Frontend + Backend)
+**Automatic Retries:** The frontend automatically retries failed requests with exponential backoff (1s, 3s, 5s delays) instead of requiring users to click again.
 
-**Frontend (`Cart.jsx`):**
-- Generate UUID when user clicks checkout button (ONCE per click)
-- Include `idempotency_key` in request body
-- Retry logic reuses the SAME key for all retry attempts
-
-**Backend (`main.go`):**
-- Before processing order, scan DynamoDB for existing order with this key
-- If found: return existing order (200 OK)
-- If not found: process normally and save with key
-
-### Part B: Automatic Retry with Exponential Backoff (Frontend)
-
-**Why automatic retries are necessary:**
-
-Without automatic retries, idempotency only prevents duplicates if the user manually retries. But users shouldn't have to click again - the system should retry automatically.
-
-**Retry strategy:**
-- Retry on timeout (`AbortError`) or 5xx server errors
-- Delays: 1s, 3s, 5s between attempts
-- **Critical**: Reuse the SAME idempotency key from the original click
-- Stop on success or non-retryable error (4xx)
-
-## Frontend Changes Needed
-
-**File:** `webapp/src/components/Cart.jsx`
-
-### What to implement:
-
-1. **Generate idempotency key at START of handleCheckout** (before try block)
-2. **Store key in variable** - this stays the same across all retries
-3. **Include key in order object**
-4. **Add retry loop** with exponential backoff delays
-5. **Reuse same key** for all retry attempts
-6. **Show retry progress** in UI
-
-## Backend Changes Needed
-
-**File:** `service/main.go`
-
-### What to implement:
-
-1. **Add `IdempotencyKey` field** to `Order` and `OrderRecord` structs
-2. **Before processing**, scan DynamoDB for existing order with this key
-3. **If found**, return existing order (prevent duplicate)
-4. **If not found**, process normally and save with key
+**How they work together:** The frontend generates a UUID once per checkout click, then retries with the SAME UUID. The backend checks DynamoDB for existing orders with this UUID - if found, returns it instead of creating a duplicate.
 
 ## Using AI to Implement
 
@@ -786,78 +742,12 @@ Please implement both frontend and backend changes.
 
 ## Testing Your Implementation
 
-### Step 1: Setup Chaos Conditions
+Use the chaos engineering techniques from Part 1 to test your implementation:
 
-Add latency toxic to simulate slow backend (requests take 5-6 seconds):
-
-```bash
-curl -X POST http://localhost:8474/proxies/chaos-proxy/toxics \
-  -H 'Content-Type: application/json' \
-  -d '{
-    "name": "latency-3000",
-    "type": "latency",
-    "attributes": {"latency": 3000, "jitter": 500}
-  }'
-```
-
-Verify timeout is 5 seconds:
-```bash
-# Check webapp/src/config.js
-grep REQUEST_TIMEOUT webapp/src/config.js
-# Should show: export const REQUEST_TIMEOUT = 5000;
-```
-
-You should see "Request timeout: 5s" displayed in the cart UI.
-
-### Step 2: Test the Flow
-
-1. **Open browser console** (F12 → Console tab)
-2. **Click checkout** once
-3. **Watch console logs:**
-   - "Sending order (attempt 1): {... idempotency_key: 'abc-123'}"
-   - "Request timed out, will retry..."
-   - "Sending order (attempt 2): {... idempotency_key: 'abc-123'}" (SAME key!)
-   - "Order response: {order_id: '...'}"
-4. **Observe UI:**
-   - First attempt shows "Processing your order..."
-   - Timeout at ~5 seconds
-   - Shows "Retrying... (attempt 2/4)"
-   - After another 1s delay, retry #1
-   - Eventually succeeds and shows "Order placed successfully!"
-
-### Step 3: Verify No Duplicates
-
-Count orders in DynamoDB:
-```bash
-aws dynamodb scan --table-name chaos-coffee-$STUDENT_ID --query 'Count'
-```
-
-**Expected:** Count increases by **1** (not 2, 3, or 4)
-
-Even though the request was sent multiple times, only ONE order was created because of the idempotency key.
-
-### Step 4: Check Backend Logs
-
-```bash
-docker logs chaos-coffee-service --tail 50
-```
-
-**Look for:**
-```
-Received order with idempotency key: abc-123-def-456
-Order processed successfully: order-xyz-789
-Received order with idempotency key: abc-123-def-456
-Found existing order order-xyz-789 with key abc-123-def-456 - returning it
-```
-
-This confirms the retry found the existing order instead of creating a duplicate.
-
-### Step 5: Clean Up
-
-Remove the toxic:
-```bash
-curl -X DELETE http://localhost:8474/proxies/chaos-proxy/toxics/latency-3000
-```
+1. **Add latency toxics** to trigger timeouts and force retries
+2. **Place orders** and watch the browser console for retry attempts
+3. **Verify in DynamoDB** that only one order was created (no duplicates)
+4. **Check the idempotency key** - it should be the same across all retry attempts
 
 ## Reflection
 
