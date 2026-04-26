@@ -128,7 +128,11 @@ resource "aws_lambda_function_url" "order_processor_url" {
   function_name      = aws_lambda_function.order_processor.function_name
   authorization_type = "NONE"
 
-  # NOTE: Intentionally NO CORS configuration here
-  # This is part of the chaos engineering exercise
-  # Students will encounter CORS errors and learn how to handle them
+  cors {
+    allow_credentials = false
+    allow_origins     = ["*"]
+    allow_methods     = ["POST", "OPTIONS"]
+    allow_headers     = ["content-type"]
+    max_age           = 86400
+  }
 }
