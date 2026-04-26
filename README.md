@@ -419,6 +419,28 @@ curl -X POST http://localhost:8474/proxies/chaos-proxy/toxics \
 - `size_variation`: Variation in packet size
 - `delay`: Delay between packets in milliseconds
 
+### Controlling Toxic Probability with `toxicity`
+
+By default, toxics apply to 100% of requests. You can control the probability using the `toxicity` parameter (value between 0 and 1):
+
+```bash
+# Apply timeout to only 30% of requests
+curl -X POST http://localhost:8474/proxies/chaos-proxy/toxics \
+  -H 'Content-Type: application/json' \
+  -d '{
+    "name": "intermittent-timeout",
+    "type": "timeout",
+    "attributes": {"timeout": 5000},
+    "toxicity": 0.3
+  }'
+```
+
+- `toxicity: 1.0` = 100% of requests affected (default)
+- `toxicity: 0.3` = 30% of requests affected
+- `toxicity: 0.5` = 50% of requests affected
+
+This is useful for simulating intermittent failures rather than complete outages.
+
 ## Step 7: Test the Enterprise Architecture Decision
 
 ### The Scenario
