@@ -139,9 +139,10 @@ resource "aws_lambda_function_url" "order_processor_url" {
 
 # Permission for Function URL to invoke Lambda
 resource "aws_lambda_permission" "function_url" {
-  statement_id           = "AllowFunctionURLInvoke"
+  statement_id           = "FunctionURLAllowPublicAccess"
   action                 = "lambda:InvokeFunctionUrl"
   function_name          = aws_lambda_function.order_processor.function_name
   principal              = "*"
   function_url_auth_type = "NONE"
+  source_arn             = aws_lambda_function_url.order_processor_url.function_arn
 }
