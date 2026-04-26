@@ -226,9 +226,13 @@ output "dynamodb_table_name" {
 }
 ```
 
-Deploy the infrastructure:
+Load your environment variables and deploy the infrastructure:
 
 ```bash
+# Export environment variables from .env file
+export $(cat .env | xargs)
+
+# Deploy infrastructure
 terraform init
 terraform plan
 terraform apply
