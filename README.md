@@ -306,9 +306,15 @@ aws dynamodb scan \
 aws dynamodb scan \
   --table-name chaos-coffee-$STUDENT_ID \
   --region eu-north-1 | jq '.Items'
+
+# Count the number of orders in your table
+aws dynamodb scan \
+  --table-name chaos-coffee-$STUDENT_ID \
+  --region eu-north-1 \
+  --select "COUNT" | jq '.Count'
 ```
 
-You should see your order data with the items you purchased, total price, and timestamp.
+You should see your order data with the items you purchased, total price, and timestamp. The count command is useful for verifying how many orders were stored during experiments.
 
 ## Step 5: Hypothesize About Network Failures
 
