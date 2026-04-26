@@ -465,8 +465,8 @@ Your Go microservice calls three external services sequentially:
 - **SAP inventory update**: ~600-900ms (but can be 2-3x slower during peak)
 - **DHL shipping creation**: ~500-700ms (but can be 2-3x slower during peak)
 
-**Normal conditions:** 2-3 seconds total ✅
-**Peak load conditions:** Could be 5-9 seconds total ⚠️
+**Normal conditions:** 2-3 seconds total
+**Peak load conditions:** Could be 5-9 seconds total
 
 ### The Experiments
 
