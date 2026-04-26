@@ -111,6 +111,22 @@ ANTHROPIC_API_KEY=sk-ant-xxxxx
 
 **Note:** The `ANTHROPIC_API_KEY` is provided by your instructor for class use. This enables Claude Code CLI to work in Part 2 and Part 3 without needing your own subscription.
 
+### Install Claude Code CLI
+
+After creating your `.env` file, install the Claude Code CLI tool globally:
+
+```bash
+npm install -g @anthropic-ai/claude-code
+```
+
+Then load your environment variables (required before using Claude Code):
+
+```bash
+export $(cat .env | xargs)
+```
+
+You'll need to run the `export` command each time you open a new terminal session.
+
 ## Lab Structure
 
 This lab follows the chaos engineering cycle:
