@@ -6,14 +6,16 @@ This hands-on lab teaches chaos engineering principles through practical experim
 
 Coffee Chaos is a React-based single-page application featuring six specialty coffee varieties from around the world: Ethiopian Yirgacheffe, Colombian Supremo, Guatemalan Antigua, Kenyan AA, Sumatra Mandheling, and Costa Rican Tarrazu. Users can browse products with detailed tasting notes, add items to their cart with smooth Framer Motion animations, adjust quantities, and complete checkout. Orders are posted to an AWS Lambda function URL and stored in DynamoDB.
 
-This lab is divided into two parts:
+This lab is divided into three parts:
 - **Part 1:** Deploy the system, run chaos experiments, observe failures
-- **Part 2:** Implement resilience patterns to make the system antifragile
+- **Part 2:** Implement tactical robustness improvements (choose one: retries, validation, or circuit breaker)
+- **Part 3:** Use AI to explore strategic re-architecture for resilience
 
 By the end of this lab, you will understand:
 - How distributed systems fail under stress
 - The scientific method of chaos engineering
-- Practical resilience patterns: retries, timeouts, circuit breakers
+- Practical resilience patterns: retries, timeouts, circuit breakers, validation
+- How to use AI assistants effectively for architectural design
 - How to build systems that improve from failure
 
 ## Getting Started with GitHub Codespaces
@@ -457,18 +459,397 @@ Save your findings - you'll implement improvements in Part 2.
 
 ---
 
-# Part 2: Implementing Resilience
+# Part 2: Robustness Improvements
 
-Part 2 instructions will be provided separately. In Part 2, you will:
+Now that you've experienced the chaos of distributed systems firsthand, it's time to make your application more robust. In this part, you'll implement improvements to handle network failures, timeouts, and other issues gracefully.
 
-1. Implement request timeouts
-2. Add retry logic with exponential backoff
-3. Implement a circuit breaker pattern
-4. Add loading states and error messages
-5. Prevent duplicate submissions with debouncing
-6. Validate improvements under chaos
+## Task Overview
 
-For reference implementations, see `solutions/webapp-resilient/`
+Choose **ONE** of the three robustness improvements below to implement. After implementing your chosen improvement:
+
+1. **Deploy** your changes (both Lambda and/or webapp as needed)
+2. **Test** using your ToxiProxy setup from Part 1
+3. **Observe** how your improvement affects the application behavior
+4. **Document** your findings (what worked, what didn't, what you learned)
+
+> **Important**: Implement one improvement at a time. Deploy, test, and observe before moving to the next one.
+
+## Option 1: Frontend Retry Logic with Exponential Backoff
+
+### Problem
+When the Lambda function is slow or temporarily unavailable, the frontend gives up after a single failed request. Users see an error immediately, even though the backend might recover in a few seconds.
+
+### Current Behavior
+In `webapp/src/components/Cart.jsx:32-44`, a single fetch request is made with no retry logic.
+
+### Your Task
+Implement a retry mechanism with exponential backoff in the Cart component:
+
+1. **Add retry logic**: If the request fails, retry up to 3 times
+2. **Exponential backoff**: Wait 1s, then 2s, then 4s between retries
+3. **User feedback**: Update the status message to show retry attempts
+4. **Timeout handling**: Add a timeout to each fetch request (e.g., 10 seconds)
+
+### Hints
+- Create a `retryFetch()` helper function that wraps the fetch call
+- Use `setTimeout()` or `async/await` with delays for backoff
+- Consider using `AbortController` for request timeouts
+- Update UI to show "Retrying (attempt 2/3)..." messages
+
+### Testing with ToxiProxy
+```bash
+# Simulate temporary outage (recovers after 5 seconds)
+curl -X POST http://localhost:8474/proxies/chaos-proxy/toxics \
+  -d '{"name": "latency_spike", "type": "latency", "attributes": {"latency": 3000}}'
+
+# Try checkout - your retry logic should succeed after 1-2 retries
+
+# Remove toxic
+curl -X DELETE http://localhost:8474/proxies/chaos-proxy/toxics/latency_spike
+```
+
+### Success Criteria
+- Application successfully completes checkout even with temporary network issues
+- User sees clear feedback about retry attempts
+- No duplicate orders are created
+
+## Option 2: Lambda Request Validation and Error Handling
+
+### Problem
+The Lambda function doesn't validate incoming requests thoroughly. Invalid data can cause crashes or be stored in DynamoDB. There's also no idempotency protection against duplicate requests.
+
+### Current Behavior
+In `lambda/main.go:68-79`, minimal validation is performed - only checks if JSON is parsable.
+
+### Your Task
+Add comprehensive validation and error handling to the Lambda function:
+
+1. **Request validation**:
+   - Verify `order.Items` is not empty
+   - Validate that item prices are positive numbers
+   - Validate that quantities are positive integers
+   - Check that `order.Total` matches the sum of items
+   - Ensure `order.Timestamp` is a valid ISO8601 date
+
+2. **Idempotency**:
+   - Accept an optional `idempotency_key` in the request
+   - Before processing, check if an order with this key already exists
+   - Return the existing order if found (preventing duplicates)
+   - Store the idempotency key in DynamoDB
+
+3. **Error responses**:
+   - Return specific HTTP status codes (400 for validation, 409 for duplicates, 500 for server errors)
+   - Include detailed error messages that help debug issues
+
+### Hints
+- Create a `validateOrder()` function that returns specific validation errors
+- Add `IdempotencyKey` field to the `Order` and `OrderRecord` structs
+- Use DynamoDB's `ConditionExpression` to prevent duplicate keys
+- Consider adding GSI on `IdempotencyKey` for efficient lookups
+
+### Testing
+```bash
+# Test with duplicate submissions
+# In your browser console:
+const order = {
+  items: [{id: "1", name: "Coffee", price: 15.99, quantity: 1}],
+  total: 15.99,
+  timestamp: new Date().toISOString(),
+  idempotency_key: "test-123"
+}
+
+// Send twice - should get same order ID both times
+await fetch(LAMBDA_URL, {
+  method: 'POST',
+  headers: {'Content-Type': 'application/json'},
+  body: JSON.stringify(order)
+})
+```
+
+### Success Criteria
+- Invalid orders are rejected with clear error messages
+- Duplicate submissions return the same order ID without creating duplicates
+- All validation errors include helpful messages for debugging
+
+## Option 3: Circuit Breaker Pattern in Frontend
+
+### Problem
+When the Lambda function is completely down, the frontend keeps trying to send requests, leading to poor user experience. Each checkout attempt takes the full timeout period before failing.
+
+### Current Behavior
+Every checkout attempt makes a request to the Lambda, regardless of previous failures. If the backend is down, users experience repeated long waits.
+
+### Your Task
+Implement the Circuit Breaker pattern in the frontend:
+
+1. **Circuit states**:
+   - **Closed**: Normal operation, requests go through
+   - **Open**: Too many failures detected, fail fast without making requests
+   - **Half-Open**: After timeout, try one request to test if backend recovered
+
+2. **Failure threshold**: Open circuit after 3 consecutive failures
+
+3. **Recovery timeout**: After 30 seconds in Open state, transition to Half-Open
+
+4. **User feedback**:
+   - Show when circuit is open ("Service temporarily unavailable, will retry in 25s")
+   - Show countdown timer
+   - Allow manual "Try Again" button
+
+### Hints
+- Create a `CircuitBreaker` class or React hook (e.g., `useCircuitBreaker()`)
+- Track failure count and circuit state in React state or localStorage
+- Use `setTimeout()` to handle recovery timeout
+- Consider showing a different UI when circuit is open
+
+### Testing with ToxiProxy
+```bash
+# Simulate complete backend failure
+curl -X POST http://localhost:8474/proxies/chaos-proxy/toxics \
+  -d '{"name": "timeout", "type": "timeout", "attributes": {"timeout": 0}}'
+
+# Try checkout 3 times - circuit should open
+# Wait for recovery period - circuit should allow one test request
+
+# Remove toxic
+curl -X DELETE http://localhost:8474/proxies/chaos-proxy/toxics/timeout
+
+# Circuit should close and requests succeed
+```
+
+### Success Criteria
+- Circuit opens after repeated failures
+- Users get immediate feedback when circuit is open
+- Circuit recovers automatically when backend comes back
+- No wasted requests when backend is known to be down
+
+## Deployment Workflow
+
+### For Lambda changes (Option 2):
+```bash
+cd lambda
+make
+cd ../my-deployment
+terraform apply
+```
+
+### For Frontend changes (Options 1 & 3):
+Restart your dev server to see changes, or build for production deployment.
+
+## Document Your Findings
+
+Create a file `ROBUSTNESS-FINDINGS.md` with:
+
+```markdown
+# Robustness Improvement Findings
+
+## Improvement Implemented
+[Option 1, 2, or 3]
+
+## Changes Made
+- Files changed: ...
+- Key code changes: ...
+
+## Testing Performed
+- Toxic used: ...
+- Expected behavior: ...
+- Actual behavior: ...
+
+## Observations
+- What worked well: ...
+- Unexpected discoveries: ...
+
+## Metrics
+- Before: [e.g., 100% failure rate with 3s latency]
+- After: [e.g., 95% success rate after retries]
+
+## Lessons Learned
+[Your insights about building robust distributed systems]
+```
+
+---
+
+# Part 3: AI-Assisted Re-Architecture
+
+In Parts 1 and 2, you worked with chaos engineering and tactical robustness improvements. Now you'll explore how AI can help you think bigger: **re-architecting the entire solution** for robustness, scalability, and maintainability.
+
+This part focuses on **working effectively with AI coding assistants** like Claude Code to explore architectural alternatives, evaluate trade-offs, and implement more sophisticated solutions.
+
+## Learning Objectives
+
+- Learn how to prompt AI assistants for architectural guidance
+- Compare minimal context vs. detailed context prompting strategies
+- Use plan mode to explore solutions before implementation
+- Critically evaluate AI-generated architectural proposals
+- Document the AI collaboration process
+
+## Overview of Experiments
+
+You'll perform **three experiments** with Claude Code, each using a different prompting strategy:
+
+1. **Minimal Context Experiment**: Give vague requirements ("make it robust")
+2. **Detailed Context Experiment**: Provide specific architectural goals
+3. **Plan Mode Experiment**: Use Claude Code's plan mode for collaborative design
+
+After each experiment, you'll **take notes** on the AI's suggestions, your assessment of them, and what you learned.
+
+## Experiment 1: Minimal Context
+
+### The Prompt
+
+Start a conversation with Claude Code and say:
+
+```
+Make my application more robust.
+```
+
+That's it. Don't provide additional context unless Claude asks.
+
+### What to Observe
+
+- What questions does Claude ask?
+- What assumptions does Claude make?
+- What solutions does Claude propose?
+- How specific or generic are the suggestions?
+- Does Claude explore the codebase before suggesting changes?
+
+### Take Notes
+
+Create a file `AI-EXPERIMENT-1-MINIMAL.md` documenting:
+- Claude's questions and assumptions
+- Solutions proposed
+- Your assessment (strengths, weaknesses, surprises)
+- What you learned about prompting AI
+
+## Experiment 2: Detailed Context
+
+### The Prompt
+
+Start a **new conversation** with detailed requirements:
+
+```
+I want to re-architect my coffee shop application for better robustness and decoupling.
+
+Current architecture:
+- React frontend with client-side cart state
+- Direct synchronous calls to AWS Lambda Function URL
+- Lambda writes to DynamoDB immediately
+- No CORS headers (intentionally broken for learning)
+
+Problems I want to solve:
+1. Frontend is tightly coupled to Lambda - failures affect user experience immediately
+2. No way to retry failed orders
+3. Orders are lost if Lambda fails after accepting the request
+4. No visibility into order status
+5. Difficult to test and debug distributed failures
+
+Goals for re-architecture:
+- Decouple frontend from backend processing
+- Make order submission asynchronous and reliable
+- Add order status tracking
+- Implement proper error recovery
+- Maintain simplicity (this is a learning project, not production)
+
+Technologies I'm already using:
+- AWS Lambda, DynamoDB, S3, CloudFront
+- React frontend
+- Terraform for IaC
+
+Please suggest an architecture that achieves these goals. Explain the trade-offs and what components I'd need to add.
+```
+
+### What to Observe
+
+- How does Claude's response differ from Experiment 1?
+- Does Claude suggest specific AWS services or patterns?
+- Does Claude explain trade-offs?
+- Are the suggestions practical given your constraints?
+
+### Take Notes
+
+Create `AI-EXPERIMENT-2-DETAILED.md` documenting:
+- Architecture proposed
+- Components to add and their trade-offs
+- Technologies suggested
+- Comparison to Experiment 1
+- What you learned
+
+## Experiment 3: Plan Mode Collaboration
+
+### The Workflow
+
+1. Start a **new conversation** and enter **plan mode**
+2. Ask Claude to explore multiple architectural options
+3. Iterate on the proposals through back-and-forth discussion
+4. Refine until you have a clear plan
+
+### Example Iteration
+
+```
+I want to improve the robustness of my coffee shop application. Before we write any code, let's create a plan.
+
+Current situation:
+- Frontend makes direct synchronous calls to Lambda
+- Lambda writes to DynamoDB immediately
+- No retry logic or error recovery
+
+I want to explore architectural options that:
+- Reduce coupling between frontend and backend
+- Allow the system to handle temporary failures gracefully
+- Don't require major rewrites (incremental improvements are OK)
+
+Let's discuss a few approaches and their trade-offs before deciding on one.
+```
+
+Then iterate with questions like:
+- "What if we wanted to keep the synchronous API but add retry logic?"
+- "How does the SQS approach compare to using Step Functions?"
+- "What's the minimal viable improvement we could ship this week?"
+
+### Take Notes
+
+Create `AI-EXPERIMENT-3-PLAN-MODE.md` documenting:
+- The iteration log (questions asked, responses)
+- Final plan agreed upon
+- How plan mode changed the collaboration
+- Quality assessment of the final plan
+
+## Optional: Implement the Plan
+
+If time permits, implement one of the proposed architectures and document what worked vs. what needed adjustment in `AI-EXPERIMENT-3-IMPLEMENTATION.md`.
+
+## Reflection
+
+After completing all experiments, create `AI-EXPERIMENTS-REFLECTION.md`:
+
+```markdown
+# Overall Reflection on AI-Assisted Architecture
+
+## Key Learnings
+1. [Most important lesson]
+2. [Second lesson]
+3. [Third lesson]
+
+## Best Practices Discovered
+- Prompting strategies that work
+- How to iterate effectively
+- When to trust vs question AI
+
+## The Human's Role
+- What can AI not do (yet)?
+- Where was your expertise critical?
+- What decisions should always be human-made?
+```
+
+## Discussion Questions
+
+Prepare to discuss:
+
+1. Which prompting strategy worked best?
+2. Did AI suggest anything you wouldn't have thought of?
+3. When would you use AI for architecture decisions in real work?
+4. What are the risks of following AI architectural suggestions?
+5. How do you validate AI-generated designs?
 
 ---
 
