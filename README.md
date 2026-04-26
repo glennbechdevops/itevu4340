@@ -299,6 +299,23 @@ Before injecting chaos, make predictions using the scientific method.
 
 ToxiProxy is a proxy that lets you inject network failures between your webapp and Lambda.
 
+### Configure ToxiProxy Upstream
+
+First, update `webapp/toxiproxy-config.json` with your Lambda Function URL from the Terraform output:
+
+```json
+[
+  {
+    "name": "chaos-proxy",
+    "listen": "0.0.0.0:8000",
+    "upstream": "https://your-actual-lambda-url.lambda-url.eu-north-1.on.aws",
+    "enabled": true
+  }
+]
+```
+
+Replace the `upstream` value with your actual Lambda Function URL.
+
 ### Start ToxiProxy
 
 From your Codespace terminal:
