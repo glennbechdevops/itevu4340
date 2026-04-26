@@ -293,10 +293,21 @@ If you see errors, check:
 - AWS credentials are set in your environment
 - DynamoDB table was created successfully
 
-**Document your observation:**
-- How fast is the checkout process?
-- What feedback does the UI provide?
-- How responsive does the application feel?
+**Verify your order was stored in DynamoDB:**
+
+```bash
+# Scan your DynamoDB table to see all orders
+aws dynamodb scan \
+  --table-name chaos-coffee-$STUDENT_ID \
+  --region eu-north-1
+
+# For a cleaner view, use jq to format the output
+aws dynamodb scan \
+  --table-name chaos-coffee-$STUDENT_ID \
+  --region eu-north-1 | jq '.Items'
+```
+
+You should see your order data with the items you purchased, total price, and timestamp.
 
 ## Step 5: Hypothesize About Network Failures
 
