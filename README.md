@@ -2,9 +2,9 @@
 
 ## Overview
 
-This hands-on lab teaches chaos engineering principles through practical experimentation with a real-world web application. You will deploy **Coffee Chaos** - a premium coffee bean e-commerce store - with a serverless backend, intentionally inject failures using ToxiProxy, observe how the system degrades, and then implement resilience patterns to make it antifragile.
+This hands-on lab teaches chaos engineering principles through practical experimentation with a real-world web application. You will deploy **Coffee Chaos** - a premium coffee bean e-commerce store - with a containerized microservice backend, intentionally inject failures using ToxiProxy, observe how the system degrades, and then implement resilience patterns to make it antifragile.
 
-Coffee Chaos is a React-based single-page application featuring six specialty coffee varieties from around the world: Ethiopian Yirgacheffe, Colombian Supremo, Guatemalan Antigua, Kenyan AA, Sumatra Mandheling, and Costa Rican Tarrazu. Users can browse products with detailed tasting notes, add items to their cart with smooth Framer Motion animations, adjust quantities, and complete checkout. Orders are posted to an AWS Lambda function URL and stored in DynamoDB.
+Coffee Chaos is a React-based single-page application featuring six specialty coffee varieties from around the world: Ethiopian Yirgacheffe, Colombian Supremo, Guatemalan Antigua, Kenyan AA, Sumatra Mandheling, and Costa Rican Tarrazu. Users can browse products with detailed tasting notes, add items to their cart with smooth Framer Motion animations, adjust quantities, and complete checkout. Orders are posted to a Go microservice and stored in DynamoDB. The entire application runs locally in Docker containers, making it easy to experiment with network failures in a controlled environment.
 
 This lab is divided into three parts:
 - **Part 1:** Deploy the system, run chaos experiments, observe failures
@@ -31,7 +31,7 @@ This lab is designed to run in GitHub Codespaces, which provides a complete deve
 
 GitHub will automatically set up your environment with:
 - Terraform pre-installed
-- Go toolchain for Lambda development
+- Go toolchain for microservice development
 - Docker for running ToxiProxy
 - AWS CLI pre-configured
 - All dependencies ready to use
@@ -42,44 +42,67 @@ Your Codespace will be ready in 1-2 minutes. No local installation required!
 
 ```mermaid
 graph LR
-    A[Web Browser] -->|HTTP POST| B[ToxiProxy]
-    B -->|Proxy| C[AWS Lambda<br/>Function URL]
-    C -->|DynamoDB SDK| D[(DynamoDB Table)]
+    A[Web Browser] -->|HTTP| B[React Webapp<br/>Port 3000]
+    B -->|HTTP POST| C[ToxiProxy<br/>Port 8000]
+    C -->|Proxy| D[Go Microservice<br/>Port 8080]
+    D -->|AWS SDK| E[(DynamoDB Table)]
 
     style A fill:#e1f5ff,stroke:#01579b
-    style B fill:#fff3e0,stroke:#e65100
-    style C fill:#f3e5f5,stroke:#4a148c
-    style D fill:#e8f5e9,stroke:#1b5e20
+    style B fill:#e8f5e9,stroke:#1b5e20
+    style C fill:#fff3e0,stroke:#e65100
+    style D fill:#f3e5f5,stroke:#4a148c
+    style E fill:#e8f5e9,stroke:#1b5e20
 ```
 
 **How it works:**
 - Users browse coffee products and add them to their shopping cart
-- The React webapp uses Framer Motion for smooth animations
-- When users click checkout, orders are posted via HTTP to a Lambda function
-- Lambda stores order data in DynamoDB
-- **ToxiProxy sits between the webapp and Lambda to inject network failures**
+- The React webapp uses Framer Motion for smooth animations and runs on port 3000
+- When users click checkout, orders are posted via HTTP to a Go microservice
+- **ToxiProxy sits between the webapp and microservice to inject network failures** (port 8000)
+- The Go microservice processes orders and stores them in DynamoDB (port 8080)
+- All services run in Docker containers orchestrated by Docker Compose
 
-### Configure AWS Credentials
+### Docker Compose Setup
 
-Once your Codespace launches, configure your AWS credentials:
+The application uses three interconnected Docker containers that start with a single command:
+
+1. **webapp** (React + Vite on port 3000)
+   - Serves the frontend application with hot-reload enabled
+   - Configured to send requests to ToxiProxy on port 8000
+
+2. **toxiproxy** (ports 8000 and 8474)
+   - Acts as a transparent proxy between webapp and Go service
+   - Port 8000: Proxy endpoint (webapp → toxiproxy → go-service)
+   - Port 8474: Control API for injecting network failures
+
+3. **go-service** (port 8080)
+   - HTTP server that processes order requests
+   - Connects to AWS DynamoDB using SDK
+   - Requires AWS credentials via environment variables
+
+All containers communicate through a Docker bridge network (`chaos-network`).
+
+### Configure Environment Variables
+
+Before starting the services, you need to set up environment variables for AWS credentials.
+
+**Create a `.env` file in the root directory:**
 
 ```bash
-aws configure
+# AWS Credentials (required)
+AWS_ACCESS_KEY_ID=your_access_key_here
+AWS_SECRET_ACCESS_KEY=your_secret_key_here
+AWS_SESSION_TOKEN=your_session_token_here  # If using temporary credentials
+
+# AWS Configuration
+AWS_REGION=eu-north-1
+
+# Application Configuration
+STUDENT_ID=your-unique-id  # Replace with your name (lowercase, no spaces)
+TABLE_NAME=chaos-coffee-your-unique-id  # DynamoDB table name (will be set after Terraform)
 ```
 
-Enter your:
-- AWS Access Key ID
-- AWS Secret Access Key
-- Default region: `eu-north-1`
-- Default output format: `json`
-
-Alternatively, set environment variables:
-
-```bash
-export AWS_ACCESS_KEY_ID=your_access_key
-export AWS_SECRET_ACCESS_KEY=your_secret_key
-export AWS_DEFAULT_REGION=eu-north-1
-```
+**Important:** The `TABLE_NAME` will be updated after you deploy infrastructure with Terraform in Step 3.
 
 ## Lab Structure
 
@@ -102,14 +125,15 @@ In Part 1, you will deploy a deliberately fragile system, run chaos experiments,
 
 Explore the repository structure using the VS Code file explorer.
 
-### Explore the Lambda Function
+### Explore the Go Microservice
 
-Open `lambda/main.go` in the VS Code editor.
+Open `service/main.go` in the VS Code editor.
 
 **Key observations:**
-- The handler accepts POST requests with JSON payload
+- The HTTP handler accepts POST requests with JSON payload
 - It stores data in DynamoDB with `student_id` as partition key
 - Simple error handling with basic logging
+- Runs as a standalone HTTP server in Docker
 
 ### Explore the Web Application
 
@@ -123,7 +147,7 @@ The webapp is a React single-page application built with Vite and Framer Motion.
 - React with Vite build tool and Framer Motion animations
 - Six premium coffee products with emoji icons, tasting notes, origin, and roast level
 - Shopping cart with add/remove functionality and quantity controls
-- Makes POST requests to Lambda function URL on checkout
+- Makes POST requests to microservice endpoint on checkout
 - **No retry logic** - failures show immediately
 - Basic error handling displays error messages but doesn't retry failed requests
 
@@ -138,33 +162,15 @@ Open the Terraform files in VS Code:
 **Key observations:**
 - Terraform module that requires `student_id` variable
 - Creates DynamoDB table with on-demand billing
-- Lambda function with Function URL enabled
 - IAM role with DynamoDB permissions
 
-## Step 2: Build the Lambda Function
+## Step 2: Deploy DynamoDB Infrastructure
 
-Before deploying with Terraform, you need to build the Lambda deployment package.
-
-From your Codespace terminal:
-
-```bash
-cd lambda
-make
-```
-
-This will:
-1. Install Go dependencies with `go mod tidy`
-2. Build the Lambda binary for Linux
-3. Create `function.zip` for deployment
-
-You should see output confirming the package was created.
-
-## Step 3: Deploy Your Infrastructure
+Before starting the application, you need to create the DynamoDB table using Terraform.
 
 From your Codespace terminal, create a deployment directory with your unique student ID:
 
 ```bash
-cd ..
 export STUDENT_ID="your-unique-id"  # Replace with your name (lowercase, no spaces)
 mkdir -p "deployment-${STUDENT_ID}"
 cd "deployment-${STUDENT_ID}"
@@ -199,13 +205,9 @@ module "coffee_chaos" {
   student_id = "YOUR_NAME_HERE"  # Replace with your name (lowercase, no spaces)
 }
 
-output "lambda_function_url" {
-  value = module.coffee_chaos.lambda_function_url
-  description = "URL to call from webapp"
-}
-
 output "dynamodb_table_name" {
   value = module.coffee_chaos.dynamodb_table_name
+  description = "DynamoDB table for storing orders"
 }
 ```
 
@@ -219,36 +221,49 @@ terraform plan
 terraform apply
 ```
 
-**Save the outputs** - you'll need the `lambda_function_url` for the webapp.
+**Save the output!** Copy the `dynamodb_table_name` value - you'll need it in the next step.
 
-## Step 4: Test the Application (Without Chaos)
+## Step 3: Start All Services with Docker Compose
 
-### Configure the Webapp
+Now that you have the DynamoDB table, update your `.env` file with the table name from Terraform output:
 
-Open `webapp/src/config.js` in VS Code and update the Lambda function URL with the output from terraform:
-
-```javascript
-export const LAMBDA_URL = 'https://your-lambda-url.lambda-url.eu-north-1.on.aws/';  // From terraform output
+```bash
+TABLE_NAME=chaos-coffee-your-student-id  # Use the actual table name from Terraform
 ```
 
-Save the file.
+Return to the project root directory and start all services with a single command:
+
+```bash
+cd /workspace/itevu4340  # Or your project root
+docker-compose up -d
+```
+
+This command will:
+1. Build the Go microservice Docker image
+2. Start the microservice on port 8080
+3. Start ToxiProxy on port 8000 (proxy) and 8474 (control API)
+4. Start the React webapp on port 3000
+5. Create a shared Docker network for inter-container communication
+
+Verify all containers are running:
+
+```bash
+docker-compose ps
+```
+
+You should see all three services (go-service, toxiproxy, webapp) with status "Up".
+
+## Step 4: Access and Test the Application
 
 ### Open the Webapp in Your Browser
 
-Start the React development server with Vite:
+The webapp is now running on port 3000. In GitHub Codespaces:
 
-```bash
-cd webapp
-npm install  # Install dependencies (first time only)
-npm run dev
-```
-
-VS Code will detect the port and show a notification. Click "Open in Browser" or:
 1. Click the "Ports" tab at the bottom of VS Code
-2. Find port 5173 (Vite dev server)
-3. Click the globe icon to open the webapp in your browser
+2. Find port 3000 (webapp)
+3. Click the globe icon to open in your browser
 
-The webapp should now be accessible at a URL like: `https://[codespace-name]-5173.preview.app.github.dev`
+The webapp should be accessible at a URL like: `https://[codespace-name]-3000.preview.app.github.dev`
 
 ### Test Normal Operation
 
@@ -258,14 +273,15 @@ The webapp should now be accessible at a URL like: `https://[codespace-name]-517
 4. Click the "Checkout" button
 
 **What should happen:**
-- The order is sent to Lambda via HTTP POST
-- Lambda stores the order in DynamoDB
+- The order is sent to the microservice via HTTP POST through ToxiProxy
+- The microservice stores the order in DynamoDB
 - You'll see a success message
 - The cart clears automatically
 
 If you see errors, check:
-- Lambda URL is configured correctly in `Cart.jsx`
-- AWS credentials are valid
+- Docker containers are running (`docker-compose ps`)
+- DynamoDB table name is configured correctly in `docker-compose.yml`
+- AWS credentials are set in your environment
 - DynamoDB table was created successfully
 
 **Document your observation:**
@@ -297,46 +313,31 @@ Before injecting chaos, make predictions using the scientific method.
 
 ## Step 6: Configure ToxiProxy
 
-ToxiProxy is a proxy that lets you inject network failures between your webapp and Lambda.
+ToxiProxy is already configured and running from Step 2. It sits between your webapp and the Go microservice to inject network failures.
 
-### Configure ToxiProxy Upstream
+### How ToxiProxy is Configured
 
-First, update `webapp/toxiproxy-config.json` with your Lambda Function URL from the Terraform output:
+The `docker-compose.yml` file configures ToxiProxy to:
+- Listen on port 8000 (proxy endpoint)
+- Forward requests to the Go microservice on port 8080
+- Expose port 8474 for the control API (to inject failures)
 
-```json
-[
-  {
-    "name": "chaos-proxy",
-    "listen": "0.0.0.0:8000",
-    "upstream": "https://your-actual-lambda-url.lambda-url.eu-north-1.on.aws",
-    "enabled": true
-  }
-]
+All services run in the same Docker network, so they can communicate using container names:
+
+```yaml
+toxiproxy:
+  image: ghcr.io/shopify/toxiproxy:latest
+  ports:
+    - "8000:8000"  # Proxy endpoint
+    - "8474:8474"  # Control API
+  networks:
+    - app-network
 ```
 
-Replace the `upstream` value with your actual Lambda Function URL.
-
-### Start ToxiProxy
-
-From your Codespace terminal:
-
-```bash
-cd webapp
-docker-compose up -d
-```
-
-This starts:
-- ToxiProxy server on port 8474 (control API)
-- Proxy listening on port 8000 (forwards to Lambda)
-
-Note: Docker is pre-installed in your Codespace. You may need to wait a few seconds for the Docker daemon to start if you just created the Codespace.
-
-### Configure the Proxy
-
-Update `webapp/src/config.js` to use ToxiProxy instead of direct Lambda URL:
+The webapp is pre-configured in `webapp/src/config.js` to use ToxiProxy:
 
 ```javascript
-export const LAMBDA_URL = 'http://localhost:8000';  // Through ToxiProxy
+export const SERVICE_URL = 'http://localhost:8000';  // Through ToxiProxy
 ```
 
 ### Add Latency Toxic
@@ -494,7 +495,7 @@ Now that you've experienced the chaos of distributed systems firsthand, it's tim
 
 Choose **ONE** of the three robustness improvements below to implement. After implementing your chosen improvement:
 
-1. **Deploy** your changes (both Lambda and/or webapp as needed)
+1. **Deploy** your changes (rebuild containers and/or restart webapp as needed)
 2. **Test** using your ToxiProxy setup from Part 1
 3. **Observe** how your improvement affects the application behavior
 4. **Document** your findings (what worked, what didn't, what you learned)
@@ -504,7 +505,7 @@ Choose **ONE** of the three robustness improvements below to implement. After im
 ## Option 1: Frontend Retry Logic with Exponential Backoff
 
 ### Problem
-When the Lambda function is slow or temporarily unavailable, the frontend gives up after a single failed request. Users see an error immediately, even though the backend might recover in a few seconds.
+When the microservice is slow or temporarily unavailable, the frontend gives up after a single failed request. Users see an error immediately, even though the backend might recover in a few seconds.
 
 ### Current Behavior
 In `webapp/src/components/Cart.jsx:32-44`, a single fetch request is made with no retry logic.
@@ -540,16 +541,16 @@ curl -X DELETE http://localhost:8474/proxies/chaos-proxy/toxics/latency_spike
 - User sees clear feedback about retry attempts
 - No duplicate orders are created
 
-## Option 2: Lambda Request Validation and Error Handling
+## Option 2: Microservice Request Validation and Error Handling
 
 ### Problem
-The Lambda function doesn't validate incoming requests thoroughly. Invalid data can cause crashes or be stored in DynamoDB. There's also no idempotency protection against duplicate requests.
+The Go microservice doesn't validate incoming requests thoroughly. Invalid data can cause crashes or be stored in DynamoDB. There's also no idempotency protection against duplicate requests.
 
 ### Current Behavior
-In `lambda/main.go:68-79`, minimal validation is performed - only checks if JSON is parsable.
+In `service/main.go`, minimal validation is performed - only checks if JSON is parsable.
 
 ### Your Task
-Add comprehensive validation and error handling to the Lambda function:
+Add comprehensive validation and error handling to the microservice:
 
 1. **Request validation**:
    - Verify `order.Items` is not empty
@@ -586,7 +587,7 @@ const order = {
 }
 
 // Send twice - should get same order ID both times
-await fetch(LAMBDA_URL, {
+await fetch('http://localhost:8000', {
   method: 'POST',
   headers: {'Content-Type': 'application/json'},
   body: JSON.stringify(order)
@@ -601,10 +602,10 @@ await fetch(LAMBDA_URL, {
 ## Option 3: Circuit Breaker Pattern in Frontend
 
 ### Problem
-When the Lambda function is completely down, the frontend keeps trying to send requests, leading to poor user experience. Each checkout attempt takes the full timeout period before failing.
+When the microservice is completely down, the frontend keeps trying to send requests, leading to poor user experience. Each checkout attempt takes the full timeout period before failing.
 
 ### Current Behavior
-Every checkout attempt makes a request to the Lambda, regardless of previous failures. If the backend is down, users experience repeated long waits.
+Every checkout attempt makes a request to the microservice, regardless of previous failures. If the backend is down, users experience repeated long waits.
 
 ### Your Task
 Implement the Circuit Breaker pattern in the frontend:
@@ -652,16 +653,18 @@ curl -X DELETE http://localhost:8474/proxies/chaos-proxy/toxics/timeout
 
 ## Deployment Workflow
 
-### For Lambda changes (Option 2):
+### For Microservice changes (Option 2):
 ```bash
-cd lambda
-make
-cd ../my-deployment
-terraform apply
+# Rebuild and restart the microservice container
+docker-compose up -d --build service
 ```
 
 ### For Frontend changes (Options 1 & 3):
-Restart your dev server to see changes, or build for production deployment.
+The Vite dev server will automatically reload when you save files. If changes don't appear, restart it:
+```bash
+cd webapp
+npm run dev
+```
 
 ## Document Your Findings
 
@@ -884,20 +887,23 @@ Prepare to discuss:
 
 When you're done with the lab, clean up your resources:
 
+### Stop All Docker Services
+
+From the project root directory:
+
+```bash
+docker-compose down
+```
+
+This will stop and remove all containers (webapp, toxiproxy, go-service).
+
 ### Destroy AWS Infrastructure
 
 From the terminal in your Codespace:
 
 ```bash
-cd my-deployment
+cd deployment-${STUDENT_ID}
 terraform destroy
-```
-
-### Stop ToxiProxy
-
-```bash
-cd ../webapp
-docker-compose down
 ```
 
 ### Delete Your Codespace
@@ -932,7 +938,7 @@ You've completed a full chaos engineering cycle:
 
 ## Additional Challenges
 
-1. **Add CloudWatch Alarms** - Alert when Lambda errors exceed threshold
+1. **Add CloudWatch Alarms** - Alert when microservice errors exceed threshold
 2. **Implement Request Deduplication** - Use idempotency keys
 3. **Add Caching** - Store orders locally, sync periodically
 4. **Multi-Region** - Deploy to two regions for higher availability
@@ -942,5 +948,5 @@ You've completed a full chaos engineering cycle:
 
 - [Principles of Chaos Engineering](https://principlesofchaos.org/)
 - [ToxiProxy Documentation](https://github.com/Shopify/toxiproxy)
-- [AWS Lambda Function URLs](https://docs.aws.amazon.com/lambda/latest/dg/lambda-urls.html)
+- [Docker Compose Documentation](https://docs.docker.com/compose/)
 - [DynamoDB Best Practices](https://docs.aws.amazon.com/amazondynamodb/latest/developerguide/best-practices.html)
