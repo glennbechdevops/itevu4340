@@ -240,12 +240,6 @@ terraform apply
 
 ## Step 3: Start All Services with Docker Compose
 
-Now that you have the DynamoDB table, update your `.env` file with the table name from Terraform output:
-
-```bash
-TABLE_NAME=chaos-coffee-your-student-id  # Use the actual table name from Terraform
-```
-
 Return to the project root directory and start all services with a single command:
 
 ```bash
