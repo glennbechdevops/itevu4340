@@ -4,7 +4,7 @@
 
 This hands-on lab teaches chaos engineering principles through practical experimentation with a real-world web application. You will deploy **Coffee Chaos** - a premium coffee bean e-commerce store - with a containerized microservice backend, intentionally inject failures using ToxiProxy, observe how the system degrades, and then implement resilience patterns to make it antifragile.
 
-Coffee Chaos is a React-based single-page application featuring six specialty coffee varieties from around the world: Ethiopian Yirgacheffe, Colombian Supremo, Guatemalan Antigua, Kenyan AA, Sumatra Mandheling, and Costa Rican Tarrazu. Users can browse products with detailed tasting notes, add items to their cart with smooth Framer Motion animations, adjust quantities, and complete checkout. Orders are posted to a Go microservice and stored in DynamoDB. The entire application runs locally in Docker containers, making it easy to experiment with network failures in a controlled environment.
+Coffee Chaos is a React-based single-page application featuring six specialty coffee varieties from around the world. Users can browse products with detailed tasting notes, add items to their cart, adjust quantities, and complete checkout. Orders are posted to a Go microservice and stored in DynamoDB. The entire application runs locally in Docker containers, making it easy to experiment with network failures in a controlled environment.
 
 This lab is divided into three parts:
 - **Part 1:** Deploy the system, run chaos experiments, observe failures
@@ -55,12 +55,14 @@ graph LR
 ```
 
 **How it works:**
-- Users browse coffee products and add them to their shopping cart
-- The React webapp uses Framer Motion for smooth animations and runs on port 3000
+- Users browse coffee products and add them to their shopping cart in the React webapp (port 3000)
 - When users click checkout, orders are posted via HTTP to a Go microservice
 - **ToxiProxy sits between the webapp and microservice to inject network failures** (port 8000)
 - The Go microservice processes orders and stores them in DynamoDB (port 8080)
 - All services run in Docker containers orchestrated by Docker Compose
+
+**About ToxiProxy:**
+ToxiProxy was created by Shopify to simulate network conditions and test application resilience in distributed systems. It acts as a transparent TCP proxy that can inject various network failures (latency, timeouts, bandwidth limits) on demand through a simple HTTP API. Originally built for Shopify's microservices infrastructure, it's now widely used across the industry to test how applications behave under adverse network conditions. Learn more at the [ToxiProxy GitHub repository](https://github.com/Shopify/toxiproxy).
 
 ### Docker Compose Setup
 
@@ -137,15 +139,15 @@ Open `service/main.go` in the VS Code editor.
 
 ### Explore the Web Application
 
-The webapp is a React single-page application built with Vite and Framer Motion. Open these key files in VS Code:
+The webapp is a React single-page application built with Vite. Open these key files in VS Code:
 
 - `webapp/src/App.jsx` - Main application component
 - `webapp/src/components/Cart.jsx` - Shopping cart with checkout logic
 - `webapp/src/data/products.js` - Six specialty coffee products
 
 **Key observations:**
-- React with Vite build tool and Framer Motion animations
-- Six premium coffee products with emoji icons, tasting notes, origin, and roast level
+- React with Vite build tool
+- Six premium coffee products with detailed tasting notes
 - Shopping cart with add/remove functionality and quantity controls
 - Makes POST requests to microservice endpoint on checkout
 - **No retry logic** - failures show immediately
@@ -168,12 +170,11 @@ Open the Terraform files in VS Code:
 
 Before starting the application, you need to create the DynamoDB table using Terraform.
 
-From your Codespace terminal, create a deployment directory with your unique student ID:
+From your Codespace terminal, create a deployment directory:
 
 ```bash
-export STUDENT_ID="your-unique-id"  # Replace with your name (lowercase, no spaces)
-mkdir -p "deployment-${STUDENT_ID}"
-cd "deployment-${STUDENT_ID}"
+mkdir -p deployment
+cd deployment
 ```
 
 Create a `main.tf` file that uses the module:
@@ -342,113 +343,220 @@ export const SERVICE_URL = 'http://localhost:8000';  // Through ToxiProxy
 
 ### Add Latency Toxic
 
-Use ToxiProxy CLI or HTTP API to add latency:
+Use curl to add toxics via the ToxiProxy HTTP API:
 
 ```bash
 # Add 2000ms latency
-docker exec -it toxiproxy /bin/sh -c "toxiproxy-cli toxic add chaos-proxy -t latency -a latency=2000"
-```
-
-Or use curl:
-
-```bash
 curl -X POST http://localhost:8474/proxies/chaos-proxy/toxics \
   -H 'Content-Type: application/json' \
   -d '{"name": "latency", "type": "latency", "attributes": {"latency": 2000}}'
 ```
 
-### Available Toxics
+### Managing Toxics with curl
 
-ToxiProxy supports many failure modes:
+ToxiProxy provides an HTTP API on port 8474 for managing network failures.
+
+**List all active toxics:**
+```bash
+curl http://localhost:8474/proxies/chaos-proxy/toxics
+```
+
+**Add a toxic:**
+```bash
+curl -X POST http://localhost:8474/proxies/chaos-proxy/toxics \
+  -H 'Content-Type: application/json' \
+  -d '{
+    "name": "my-toxic-name",
+    "type": "latency",
+    "attributes": {"latency": 2000}
+  }'
+```
+
+**Delete a specific toxic** (toxic name goes at the end of the URL):
+```bash
+curl -X DELETE http://localhost:8474/proxies/chaos-proxy/toxics/my-toxic-name
+```
+
+**Check proxy status:**
+```bash
+curl http://localhost:8474/proxies/chaos-proxy
+```
+
+### Available Toxic Types
+
+ToxiProxy supports many failure modes you can inject:
 
 **Latency:** Add delay to requests
 ```bash
-{"type": "latency", "attributes": {"latency": 2000, "jitter": 500}}
+curl -X POST http://localhost:8474/proxies/chaos-proxy/toxics \
+  -H 'Content-Type: application/json' \
+  -d '{"name": "slow-response", "type": "latency", "attributes": {"latency": 2000, "jitter": 500}}'
 ```
-
-**Bandwidth:** Limit throughput
-```bash
-{"type": "bandwidth", "attributes": {"rate": 1024}}
-```
+- `latency`: Base delay in milliseconds
+- `jitter`: Random variation (±jitter ms)
 
 **Timeout:** Close connection after delay
 ```bash
-{"type": "timeout", "attributes": {"timeout": 1000}}
+curl -X POST http://localhost:8474/proxies/chaos-proxy/toxics \
+  -H 'Content-Type: application/json' \
+  -d '{"name": "connection-timeout", "type": "timeout", "attributes": {"timeout": 3000}}'
 ```
+- `timeout`: Milliseconds before closing connection
 
-**Slicer:** Slice data into small packets
+**Bandwidth:** Limit throughput
 ```bash
-{"type": "slicer", "attributes": {"average_size": 64, "size_variation": 32, "delay": 10}}
+curl -X POST http://localhost:8474/proxies/chaos-proxy/toxics \
+  -H 'Content-Type: application/json' \
+  -d '{"name": "slow-network", "type": "bandwidth", "attributes": {"rate": 1024}}'
+```
+- `rate`: Bytes per second (1024 = 1KB/s)
+
+**Slicer:** Slice data into small packets with delays
+```bash
+curl -X POST http://localhost:8474/proxies/chaos-proxy/toxics \
+  -H 'Content-Type: application/json' \
+  -d '{"name": "packet-loss", "type": "slicer", "attributes": {"average_size": 64, "size_variation": 32, "delay": 10}}'
+```
+- `average_size`: Average packet size in bytes
+- `size_variation`: Variation in packet size
+- `delay`: Delay between packets in milliseconds
+
+## Step 7: Run the Chaos Experiment - The Timeout Cascade
+
+### The Scenario
+
+Your Go microservice takes **2-3 seconds** to process each order because it calls three external services sequentially:
+
+- **Credit card processing**: ~500-900ms
+- **SAP inventory update**: ~600-900ms
+- **DHL shipping creation**: ~500-700ms
+- **Total**: 2-3 seconds per order
+
+Many network components (load balancers, CDNs, API gateways) have default **3-second timeouts**. This creates a dangerous situation where your service *usually* finishes in time... but not always.
+
+### The Hypothesis
+
+**Write down your prediction before running the experiment:**
+
+*"If we add a 3-second timeout to ToxiProxy (simulating a load balancer timeout), and the service naturally takes 2-3 seconds to process orders, what will happen?"*
+
+Consider:
+- Will all orders succeed? All fail? Some of each?
+- If some fail, can users tell which ones?
+- What happens to orders that the frontend thinks failed?
+- Will users retry failed orders?
+
+### Setup the Experiment
+
+**Step 1: Clear any existing toxics** (start with a clean slate):
+
+First, list all active toxics to see what needs to be removed:
+
+```bash
+curl http://localhost:8474/proxies/chaos-proxy/toxics
 ```
 
-## Step 7: Run Experiments and Observe
+Remove each toxic by name (the name appears at the end of the URL):
 
-### Experiment 1: High Latency
+```bash
+# Example: if you see toxics named "latency", "slow-bandwidth", etc.
+curl -X DELETE http://localhost:8474/proxies/chaos-proxy/toxics/latency
+curl -X DELETE http://localhost:8474/proxies/chaos-proxy/toxics/slow-bandwidth
+curl -X DELETE http://localhost:8474/proxies/chaos-proxy/toxics/timeoit
+```
 
-**Setup:** 2000ms latency, 500ms jitter
+Verify all toxics are removed:
+
+```bash
+curl http://localhost:8474/proxies/chaos-proxy/toxics
+# Should return: []
+```
+
+**Step 2: Add a 3-second timeout toxic** (simulating strict infrastructure timeout):
 
 ```bash
 curl -X POST http://localhost:8474/proxies/chaos-proxy/toxics \
   -H 'Content-Type: application/json' \
-  -d '{"name": "high-latency", "type": "latency", "attributes": {"latency": 2000, "jitter": 500}}'
+  -d '{
+    "name": "infrastructure-timeout",
+    "type": "timeout",
+    "attributes": {"timeout": 3000}
+  }'
 ```
 
-**Test:**
-1. Add coffee to your cart and click "Checkout"
-2. Observe the delay in order processing
-3. Try clicking checkout multiple times before first response returns
-4. Check DynamoDB for duplicate orders
-
-**Measure:**
-- How long does each checkout request take?
-- Do users get frustrated and click checkout again?
-- Are there duplicate orders in the database?
-- Does the UI give any feedback during the wait?
-
-### Experiment 2: Random Failures
-
-**Setup:** 5000ms timeout
+Verify it's active:
 
 ```bash
-curl -X POST http://localhost:8474/proxies/chaos-proxy/toxics \
-  -H 'Content-Type: application/json' \
-  -d '{"name": "timeout", "type": "timeout", "attributes": {"timeout": 5000}}'
+curl http://localhost:8474/proxies/chaos-proxy/toxics
 ```
 
-**Test:**
-1. Click checkout multiple times
-2. Some requests will timeout
-3. Others will succeed
+### Run the Experiment
 
-**Measure:**
-- What is the failure rate?
-- How does the UI show failures?
-- Can users tell if their order worked?
+**Test checkout 5-10 times and document each attempt:**
 
-### Experiment 3: Limited Bandwidth
+1. Add coffee to your cart
+2. Click "Checkout"
+3. Note the result (success or error message)
+4. Repeat
 
-**Setup:** 1KB/s bandwidth limit
+**Create a simple table to track results:**
 
+| Attempt | Frontend Result | Time to Response |
+|---------|----------------|------------------|
+| 1       | Success / Error | ~X seconds      |
+| 2       | Success / Error | ~X seconds      |
+| 3       | Success / Error | ~X seconds      |
+| ...     | ...            | ...             |
+
+### What to Observe
+
+**1. Check the browser console** (F12 → Console tab):
+- Do you see 500 errors?
+- What error message is displayed?
+
+**2. Check the microservice logs**:
 ```bash
-curl -X POST http://localhost:8474/proxies/chaos-proxy/toxics \
-  -H 'Content-Type: application/json' \
-  -d '{"name": "slow-bandwidth", "type": "bandwidth", "attributes": {"rate": 1024}}'
+docker logs -f chaos-coffee-service
 ```
+- Did the service finish processing even when frontend showed error?
+- How long did each order take to process?
 
-**Test:**
-1. Make requests and observe slow responses
-2. Multiple concurrent requests
+**3. Check DynamoDB for data consistency**:
+```bash
+aws dynamodb scan --table-name chaos-coffee-${STUDENT_ID} \
+  --query 'Items[*].[order_id.S, timestamp.S]' \
+  --output table
+```
+- How many orders are in the database?
+- Are there orders that the frontend reported as "failed"?
 
-**Measure:**
-- How does slow bandwidth affect user experience?
-- Do requests queue up?
+### Expected Discovery
 
-### Reset Between Experiments
+You'll likely discover a **critical production issue**:
 
-Remove all toxics to reset:
+- **Some orders succeed** (when processing takes <3 seconds)
+- **Some orders fail** (when processing takes ≥3 seconds)
+- **Inconsistent behavior**: "It worked last time, why not now?"
+- **Data inconsistency**: Frontend shows error, but order was saved to DynamoDB
+- **User confusion**: Users retry "failed" orders, creating duplicates
+
+### The Problem: Timeout Cascade
+
+This is a real-world issue called the **"timeout cascade"**:
+
+1. Service processing time varies (2-3 seconds)
+2. Infrastructure timeout is barely long enough (3 seconds)
+3. Some requests succeed, some fail (**intermittent failures are hardest to debug**)
+4. Frontend can't distinguish timeout from actual failure
+5. Users retry, creating duplicate orders
+6. No one is happy
+
+### Clean Up
+
+Remove the timeout toxic when done:
 
 ```bash
-curl -X DELETE http://localhost:8474/proxies/chaos-proxy/toxics/high-latency
+curl -X DELETE http://localhost:8474/proxies/chaos-proxy/toxics/infrastructure-timeout
 ```
 
 ## Step 8: Reflect and Document Your Findings
@@ -902,7 +1010,7 @@ This will stop and remove all containers (webapp, toxiproxy, go-service).
 From the terminal in your Codespace:
 
 ```bash
-cd deployment-${STUDENT_ID}
+cd deployment
 terraform destroy
 ```
 
