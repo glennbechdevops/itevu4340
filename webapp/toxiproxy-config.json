@@ -2,7 +2,7 @@
   {
     "name": "chaos-proxy",
     "listen": "0.0.0.0:8000",
-    "upstream": "REPLACE_WITH_LAMBDA_FUNCTION_URL",
+    "upstream": "go-service:8080",
     "enabled": true
   }
 ]

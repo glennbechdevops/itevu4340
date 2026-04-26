@@ -1,0 +1,65 @@
+version: '3.8'
+
+services:
+  # Go microservice - Order processor
+  go-service:
+    build:
+      context: ./service
+      dockerfile: Dockerfile
+    container_name: chaos-coffee-service
+    ports:
+      - "8080:8080"
+    environment:
+      - TABLE_NAME=${TABLE_NAME:-chaos-coffee-$STUDENT_ID}
+      - STUDENT_ID=${STUDENT_ID:-student}
+      - AWS_REGION=${AWS_REGION:-eu-north-1}
+      - AWS_ACCESS_KEY_ID=${AWS_ACCESS_KEY_ID}
+      - AWS_SECRET_ACCESS_KEY=${AWS_SECRET_ACCESS_KEY}
+
+      - PORT=8080
+    networks:
+      - chaos-network
+    healthcheck:
+      test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://localhost:8080/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+
+  # ToxiProxy - Network chaos proxy
+  toxiproxy:
+    image: ghcr.io/shopify/toxiproxy:2.9.0
+    container_name: chaos-toxiproxy
+    ports:
+      - "8000:8000"
+      - "8474:8474"  # ToxiProxy API
+    volumes:
+      - ./webapp/toxiproxy-config.json:/config/toxiproxy.json
+    networks:
+      - chaos-network
+    depends_on:
+      - go-service
+    command: ["-host", "0.0.0.0", "-config", "/config/toxiproxy.json"]
+
+  # React webapp - Frontend
+  webapp:
+    build:
+      context: ./webapp
+      dockerfile: Dockerfile
+    container_name: chaos-coffee-webapp
+    ports:
+      - "3000:3000"
+    volumes:
+      - ./webapp/src:/app/src
+      - ./webapp/public:/app/public
+      - ./webapp/index.html:/app/index.html
+      - ./webapp/vite.config.js:/app/vite.config.js
+    networks:
+      - chaos-network
+    depends_on:
+      - toxiproxy
+    environment:
+      - NODE_ENV=development
+
+networks:
+  chaos-network:
+    driver: bridge

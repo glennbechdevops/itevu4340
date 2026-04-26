@@ -1,6 +1,6 @@
 import React, { useState } from 'react'
 import { motion } from 'framer-motion'
-import { LAMBDA_URL } from '../config.js'
+import { SERVICE_URL } from '../config.js'
 
 const Cart = ({ cart, onClose, onUpdateQuantity, onRemoveItem, totalPrice }) => {
   const [isProcessing, setIsProcessing] = useState(false)
@@ -27,9 +27,9 @@ const Cart = ({ cart, onClose, onUpdateQuantity, onRemoveItem, totalPrice }) => 
         timestamp: new Date().toISOString()
       }
 
-      console.log('Sending order to Lambda:', order)
+      console.log('Sending order to service:', order)
 
-      const response = await fetch(LAMBDA_URL, {
+      const response = await fetch(SERVICE_URL, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json'
@@ -150,8 +150,8 @@ const Cart = ({ cart, onClose, onUpdateQuantity, onRemoveItem, totalPrice }) => 
             className="checkout-button"
             onClick={handleCheckout}
             disabled={isProcessing || cart.length === 0}
-            whileHover={{ scale: cart.length > 0 ? 1.05 : 1 }}
-            whileTap={{ scale: cart.length > 0 ? 0.95 : 1 }}
+            whileHover={{ scale: cart.length > 0 && !isProcessing ? 1.05 : 1 }}
+            whileTap={{ scale: cart.length > 0 && !isProcessing ? 0.95 : 1 }}
           >
             {isProcessing ? 'Processing...' : 'Checkout'}
           </motion.button>
