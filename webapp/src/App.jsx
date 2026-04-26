@@ -1,85 +1,67 @@
-import { useState } from 'react';
-import { motion, AnimatePresence } from 'framer-motion';
-import { products } from './data/products';
-import ProductCard from './components/ProductCard';
-import Cart from './components/Cart';
-import Header from './components/Header';
-import './App.css';
+import React, { useState } from 'react'
+import { motion, AnimatePresence } from 'framer-motion'
+import Header from './components/Header'
+import ProductGrid from './components/ProductGrid'
+import Cart from './components/Cart'
+import { products } from './data/products'
+import './App.css'
 
 function App() {
-  const [cart, setCart] = useState([]);
-  const [isCartOpen, setIsCartOpen] = useState(false);
+  const [cart, setCart] = useState([])
+  const [isCartOpen, setIsCartOpen] = useState(false)
 
   const addToCart = (product) => {
-    const existingItem = cart.find(item => item.id === product.id);
+    const existingItem = cart.find(item => item.id === product.id)
 
     if (existingItem) {
       setCart(cart.map(item =>
         item.id === product.id
           ? { ...item, quantity: item.quantity + 1 }
           : item
-      ));
+      ))
     } else {
-      setCart([...cart, { ...product, quantity: 1 }]);
+      setCart([...cart, { ...product, quantity: 1 }])
     }
 
-    setIsCartOpen(true);
-  };
+    setIsCartOpen(true)
+  }
 
-  const updateQuantity = (productId, change) => {
-    setCart(cart.map(item => {
-      if (item.id === productId) {
-        const newQuantity = item.quantity + change;
-        return newQuantity > 0 ? { ...item, quantity: newQuantity } : item;
-      }
-      return item;
-    }).filter(item => item.quantity > 0));
-  };
+  const updateQuantity = (productId, newQuantity) => {
+    if (newQuantity === 0) {
+      setCart(cart.filter(item => item.id !== productId))
+    } else {
+      setCart(cart.map(item =>
+        item.id === productId
+          ? { ...item, quantity: newQuantity }
+          : item
+      ))
+    }
+  }
 
   const removeFromCart = (productId) => {
-    setCart(cart.filter(item => item.id !== productId));
-  };
+    setCart(cart.filter(item => item.id !== productId))
+  }
 
-  const clearCart = () => {
-    setCart([]);
-  };
+  const getTotalItems = () => {
+    return cart.reduce((sum, item) => sum + item.quantity, 0)
+  }
 
-  const cartItemCount = cart.reduce((sum, item) => sum + item.quantity, 0);
-  const cartTotal = cart.reduce((sum, item) => sum + (item.price * item.quantity), 0);
+  const getTotalPrice = () => {
+    return cart.reduce((sum, item) => sum + (item.price * item.quantity), 0)
+  }
 
   return (
     <div className="app">
       <Header
-        cartItemCount={cartItemCount}
+        cartItemCount={getTotalItems()}
         onCartClick={() => setIsCartOpen(true)}
       />
 
       <main className="main-content">
-        <motion.div
-          className="hero"
-          initial={{ opacity: 0, y: -20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.6 }}
-        >
-          <h2>Premium Coffee Beans</h2>
-          <p>Ethically sourced, expertly roasted, delivered fresh</p>
-        </motion.div>
-
-        <motion.div
-          className="products-grid"
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
-          transition={{ duration: 0.6, delay: 0.2 }}
-        >
-          {products.map((product, index) => (
-            <ProductCard
-              key={product.id}
-              product={product}
-              onAddToCart={addToCart}
-              index={index}
-            />
-          ))}
-        </motion.div>
+        <ProductGrid
+          products={products}
+          onAddToCart={addToCart}
+        />
       </main>
 
       <AnimatePresence>
@@ -89,13 +71,12 @@ function App() {
             onClose={() => setIsCartOpen(false)}
             onUpdateQuantity={updateQuantity}
             onRemoveItem={removeFromCart}
-            onClearCart={clearCart}
-            cartTotal={cartTotal}
+            totalPrice={getTotalPrice()}
           />
         )}
       </AnimatePresence>
     </div>
-  );
+  )
 }
 
-export default App;
+export default App

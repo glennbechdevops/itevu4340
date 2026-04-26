@@ -1,22 +1,26 @@
-import { motion } from 'framer-motion';
+import React from 'react'
+import { motion } from 'framer-motion'
 
-export default function ProductCard({ product, onAddToCart, index }) {
+const cardVariants = {
+  hidden: { y: 20, opacity: 0 },
+  show: { y: 0, opacity: 1 }
+}
+
+const ProductCard = ({ product, onAddToCart }) => {
+  const formattedPrice = product.price.toFixed(2)
+  
   return (
     <motion.div
       className="product-card"
-      initial={{ opacity: 0, y: 20 }}
-      animate={{ opacity: 1, y: 0 }}
-      transition={{ duration: 0.4, delay: index * 0.1 }}
+      variants={cardVariants}
       whileHover={{ y: -8, transition: { duration: 0.2 } }}
     >
-      <div className="product-image">
-        <span className="product-emoji">{product.emoji}</span>
-        <div className="roast-badge">{product.roast}</div>
-      </div>
+      <div className="product-image">{product.image}</div>
 
-      <div className="product-details">
+      <div className="product-info">
         <h3 className="product-name">{product.name}</h3>
-        <p className="product-origin">{product.origin}</p>
+        <p className="product-origin">Origin: {product.origin}</p>
+        <p className="product-roast">Roast: {product.roast}</p>
         <p className="product-description">{product.description}</p>
 
         <div className="product-notes">
@@ -26,7 +30,7 @@ export default function ProductCard({ product, onAddToCart, index }) {
         </div>
 
         <div className="product-footer">
-          <span className="product-price">${product.price.toFixed(2)}</span>
+          <span className="product-price">${formattedPrice}</span>
           <motion.button
             className="add-to-cart-btn"
             onClick={() => onAddToCart(product)}
@@ -38,5 +42,7 @@ export default function ProductCard({ product, onAddToCart, index }) {
         </div>
       </div>
     </motion.div>
-  );
+  )
 }
+
+export default ProductCard

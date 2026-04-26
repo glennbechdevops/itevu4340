@@ -2,61 +2,61 @@ export const products = [
   {
     id: 'ethiopian-yirgacheffe',
     name: 'Ethiopian Yirgacheffe',
-    description: 'Floral and citrus notes with a bright, clean finish. Perfect for pour-over brewing methods.',
-    origin: 'Yirgacheffe, Ethiopia',
-    price: 18.99,
+    description: 'Floral and citrus notes with a bright, clean finish. Perfect for pour-over.',
+    origin: 'Ethiopia',
     roast: 'Light',
-    notes: ['Floral', 'Citrus', 'Bergamot'],
-    emoji: '☕'
+    price: 18.99,
+    image: '☕',
+    notes: ['Floral', 'Citrus', 'Jasmine']
   },
   {
     id: 'colombian-supremo',
     name: 'Colombian Supremo',
-    description: 'Rich, full-bodied with chocolate undertones. A classic morning brew that never disappoints.',
-    origin: 'Huila, Colombia',
-    price: 16.99,
+    description: 'Rich, full-bodied with chocolate undertones. A classic morning brew.',
+    origin: 'Colombia',
     roast: 'Medium',
-    notes: ['Chocolate', 'Nuts', 'Caramel'],
-    emoji: '🌋'
+    price: 16.99,
+    image: '🌋',
+    notes: ['Chocolate', 'Caramel', 'Nutty']
   },
   {
     id: 'guatemalan-antigua',
     name: 'Guatemalan Antigua',
-    description: 'Spicy and smoky with a complex flavor profile. Medium roast excellence from volcanic soil.',
-    origin: 'Antigua, Guatemala',
-    price: 17.99,
+    description: 'Spicy and smoky with a complex flavor profile. Medium roast excellence.',
+    origin: 'Guatemala',
     roast: 'Medium',
-    notes: ['Spice', 'Smoke', 'Cocoa'],
-    emoji: '🏔️'
+    price: 17.99,
+    image: '🏔️',
+    notes: ['Spicy', 'Smoky', 'Cocoa']
   },
   {
     id: 'kenyan-aa',
     name: 'Kenyan AA',
-    description: 'Bold and wine-like with berry notes. Exceptional clarity and body from high-altitude growing.',
-    origin: 'Nyeri, Kenya',
-    price: 19.99,
+    description: 'Bold and wine-like with berry notes. Exceptional clarity and body.',
+    origin: 'Kenya',
     roast: 'Medium-Dark',
-    notes: ['Berry', 'Wine', 'Black Currant'],
-    emoji: '🦁'
+    price: 19.99,
+    image: '🦁',
+    notes: ['Berry', 'Wine', 'Black Currant']
   },
   {
     id: 'sumatra-mandheling',
     name: 'Sumatra Mandheling',
-    description: 'Earthy and full-bodied with low acidity. Perfect for French press and cold brew.',
-    origin: 'Sumatra, Indonesia',
-    price: 17.49,
+    description: 'Earthy and full-bodied with low acidity. Perfect for French press.',
+    origin: 'Indonesia',
     roast: 'Dark',
-    notes: ['Earth', 'Herbs', 'Cedar'],
-    emoji: '🌿'
+    price: 17.49,
+    image: '🌿',
+    notes: ['Earthy', 'Herbal', 'Cedar']
   },
   {
     id: 'costa-rican-tarrazu',
     name: 'Costa Rican Tarrazu',
-    description: 'Clean and balanced with bright acidity. A refined Central American gem with honey sweetness.',
-    origin: 'Tarrazu, Costa Rica',
+    description: 'Clean and balanced with bright acidity. A refined Central American gem.',
+    origin: 'Costa Rica',
+    roast: 'Light-Medium',
     price: 18.49,
-    roast: 'Medium',
-    notes: ['Honey', 'Apple', 'Almond'],
-    emoji: '🌴'
+    image: '🌴',
+    notes: ['Honey', 'Apple', 'Almond']
   }
-];
+]
