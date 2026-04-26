@@ -122,10 +122,10 @@ npm install -g @anthropic-ai/claude-code
 Then load your environment variables (required before using Claude Code):
 
 ```bash
-export $(cat .env | xargs)
+set -a; source .env; set +a
 ```
 
-You'll need to run the `export` command each time you open a new terminal session.
+You'll need to run this command each time you open a new terminal session. This exports all variables from `.env` to your shell.
 
 ## Lab Structure
 
@@ -226,17 +226,15 @@ output "dynamodb_table_name" {
 }
 ```
 
-Load your environment variables and deploy the infrastructure:
+Deploy the infrastructure:
 
 ```bash
-# Export environment variables from .env file
-export $(cat .env | xargs)
-
-# Deploy infrastructure
 terraform init
 terraform plan
 terraform apply
 ```
+
+**Note:** Make sure you've already loaded your environment variables from the root directory (see "Install Claude Code CLI" section above). The variables remain available when you change directories.
 
 **Save the output!** Copy the `dynamodb_table_name` value - you'll need it in the next step.
 
