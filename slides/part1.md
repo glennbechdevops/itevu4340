@@ -2,18 +2,35 @@
 <!-- layout: title -->
 <!-- caption: Glenn Bech 2026 -->
 
-## Why DevOps Matters in Architecture (and the Data That Proves It)
+# Why DevOps Matters in Architecture (and the Data That Proves It)
 
 # Why DevOps in an Architecture Class?
-<!-- layout: image-right -->
-<!-- image: https://images.unsplash.com/photo-1558494949-ef010cbdcc31?w=1920 -->
-<!-- caption: Photo by Alvaro Reyes on Unsplash -->
+<!-- layout: two-column -->
 
-Architecture enables or constrains DevOps practices.
+## The Traditional View
 
-**Key insight:** You can't bolt DevOps onto poor architecture.
+**DevOps focuses on:**
+- Development practices
+- Operations workflows
+- Team collaboration
+- CI/CD pipelines
+- Automation tools
 
-Today we'll prove this connection with research data.
+**This is about Dev + Ops collaboration, right?**
+
+<!-- column-break -->
+
+## The Missing Foundation
+
+**Architecture determines:**
+- Whether services can deploy independently
+- If teams can work autonomously
+- How fast you get feedback
+- Your ability to recover from failures
+
+**You cannot automate deployment of a monolith requiring coordinated releases.**
+
+**Today we will prove this connection with research data.**
 
 # The Three Ways of DevOps
 <!-- layout: image-left -->
@@ -49,6 +66,7 @@ These principles require architectural support.
 - Automated testing
 - Fast build times
 - Clear module boundaries
+- Non-functional requirements (performance, scalability, reliability)
 
 **Or create bottlenecks:**
 - Tight coupling between services
@@ -57,16 +75,33 @@ These principles require architectural support.
 - Manual deployment steps
 
 # The Second Way: Feedback
+<!-- layout: two-column -->
+
+## What is Feedback?
 
 **Amplify feedback loops to detect and respond to problems quickly**
 
-**Feedback mechanisms:**
+**Key principles:**
 - Automated testing at all levels
 - Continuous monitoring and observability
 - Fast deployment cycles
 - A/B testing and feature flags
 
-Architecture must be observable, testable, and deployable to enable fast feedback.
+<!-- column-break -->
+
+## Architecture's Role
+
+**Architecture can enable feedback:**
+- Observable systems (logging, metrics, tracing)
+- Testable components with clear interfaces
+- Fast build and deployment pipelines
+- Isolated failure domains
+
+**Or create blind spots:**
+- Black box systems without visibility
+- Tightly coupled components hard to test
+- Long feedback cycles from change to production
+- Cascading failures across services
 
 # The Third Way: Continuous Learning
 
