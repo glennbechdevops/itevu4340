@@ -542,13 +542,13 @@ curl -X DELETE http://localhost:8474/proxies/chaos-proxy/toxics/enterprise-timeo
 
 **Setup:**
 ```bash
-# Add 3000ms latency (simulates heavy external load)
+# Add 3000ms latency with 500ms jitter (simulates heavy external load)
 curl -X POST http://localhost:8474/proxies/chaos-proxy/toxics \
   -H 'Content-Type: application/json' \
   -d '{
     "name": "black-friday-latency",
     "type": "latency",
-    "attributes": {"latency": 3000}
+    "attributes": {"latency": 3000, "jitter": 500}
   }'
 
 # Add 5-second timeout (enterprise rule)
