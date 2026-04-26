@@ -1,8 +1,8 @@
-# Robust Architectures
+# Robust Architectures 2
 <!-- layout: title -->
 <!-- caption: Glenn Bech 2026 -->
 
-# Why DevOps Matters in Architecture (and the Data That Proves It)
+# Why DevOps Matters in Architecture (and the Data That Proves z)
 
 # Why DevOps in an Architecture Class?
 <!-- layout: two-column -->
