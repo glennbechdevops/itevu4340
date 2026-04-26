@@ -53,5 +53,9 @@
     "source=${localEnv:HOME}/.aws,target=/home/vscode/.aws,type=bind,consistency=cached"
   ],
 
-  "remoteUser": "vscode"
+  "remoteUser": "vscode",
+
+  "containerEnv": {
+    "ANTHROPIC_API_KEY": "${localEnv:ANTHROPIC_API_KEY}"
+  }
 }
