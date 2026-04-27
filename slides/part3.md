@@ -2,7 +2,7 @@
 <!-- layout: title -->
 <!-- caption: Glenn Bech 2026 -->
 
-## A Journey Through Building QuizRiot with AI Assistance
+## Architecting in the age of AI
 
 # The Central Question
 <!-- layout: image-focus -->
@@ -13,28 +13,20 @@
 
 # The Common Assumption
 
-**What people assume AI can do:**
+**When I tell people I build things with AI they think:**
 
 > "Just prompt: 'Make me Kahoot' and you're done, right?"
 
-**The reality:**
-- AI doesn't understand your constraints
-- AI doesn't know your business context
-- AI suggests patterns, not solutions
-- Architecture requires judgment AI lacks
+# Example: Building an AI-based Quiz Generator and Player
 
-Let me show you what actually happens.
+Here's what I learned building QuizRiot with AI as a coding partner.
 
-# My Journey: Building QuizRiot
+# QuizRiot Demo
+<!-- layout: image-focus -->
+<!-- image: https://images.unsplash.com/photo-1523580494863-6f3031224c94?w=1920 -->
+<!-- caption: Photo by KOBU Agency on Unsplash -->
 
-**[INSERT: Your personal story and QuizRiot screenshots]**
-
-**Why I built QuizRiot:**
-- [Your motivation]
-- [What made it different]
-- [Why you chose to use AI as a partner]
-
-This is a real case study, not theory.
+QuizRiot demo
 
 # The Architecture Challenge
 <!-- layout: image-right -->
@@ -49,15 +41,41 @@ This is a real case study, not theory.
 
 Standard patterns don't fit these constraints.
 
-# The Unique Solution
+# What AI Suggested
+<!-- layout: two-column -->
+
+## AI's Recommendations
+
+**Standard patterns AI proposed:**
+- "Use AWS Fargate for container orchestration"
+- "Implement auto-scaling groups"
+- "Consider managed Kubernetes (EKS)"
+- "Use API Gateway for WebSocket connections"
+- "WebSocket connections to shared backend"
+
+All reasonable, all wrong for my constraints.
+
+<!-- column-break -->
+
+## Why AI Missed
+
+**What AI didn't understand:**
+- My cost constraints
+- Design philosophy of keeping things as simple as possible
+- Session isolation requirements
+- Startup time criticality
+- Operational complexity tolerance
+
+**AI knows patterns.**
+**AI doesn't know your context.**
+
+# My Solution
 <!-- layout: two-column -->
 
 ## My Approach
 
-**[INSERT: QuizRiot architecture diagram]**
-
 **Key decisions:**
-- Containers per session
+- Individual container per game session
 - Instant EC2 startup (sub-second)
 - Event-driven scaling
 - Session-based isolation
@@ -78,44 +96,20 @@ Standard patterns don't fit these constraints.
 - Simple mental model
 - Measurable costs per session
 
-# What AI Suggested
-<!-- layout: two-column -->
-
-## AI's Recommendations
-
-**Standard patterns AI proposed:**
-- "Use AWS Fargate for container orchestration"
-- "Implement auto-scaling groups"
-- "Consider managed Kubernetes (EKS)"
-- "WebSocket connections to shared backend"
-
-All reasonable, all wrong for my constraints.
-
-<!-- column-break -->
-
-## Why AI Missed
-
-**What AI didn't understand:**
-- My cost constraints
-- Session isolation requirements
-- Startup time criticality
-- Operational complexity tolerance
-
-**AI knows patterns.**
-**AI doesn't know your context.**
-
 # Cost Analysis
 <!-- layout: image-left -->
 <!-- image: https://images.unsplash.com/photo-1554224155-6726b3ff858f?w=1920 -->
 <!-- caption: Photo by Adeolu Eletu on Unsplash -->
 
 **Fargate approach (AI suggestion):**
+- Centralized solution with shared infrastructure for all game sessions
 - Always-on containers for peak load
 - 24/7 costs even with no sessions
 - Complex orchestration overhead
 
 **My approach:**
 - Pay only for active sessions
+- Session hosted by container
 - Sub-second startup enables true on-demand
 - Simpler operational model
 
@@ -132,7 +126,7 @@ AI handled implementation details:
 - CloudWatch metrics setup
 - Basic error handling
 
-Speed improvement: 3-5x faster than manual coding.
+Speed improvement: At least 10x faster than manual coding.
 
 <!-- column-break -->
 
@@ -144,7 +138,20 @@ AI generated Terraform:
 - Networking configurations
 - Standard patterns
 
-Quality: Good starting point, required review and refinement.
+Quality: Very high quality and on point most of the time.
+
+# AI Blind Spots
+<!-- layout: image-left -->
+<!-- image: https://images.unsplash.com/photo-1451187580459-43490279c0fa?w=1920 -->
+<!-- caption: Photo by NASA on Unsplash -->
+
+**Where AI struggles:**
+
+Always trips up on the same things:
+- Lambda function URLs and permissions
+- Lambda CORS headers
+
+**You still need to know your platform.**
 
 # AI for Organization
 <!-- layout: image-right -->
@@ -167,7 +174,7 @@ This is where AI shines: structured, repetitive tasks with clear patterns.
 
 2. Thinking about QuizRiot: If you described your project to AI, what context would it miss?
 
-3. Share an architectural decision where AI suggestions wouldn't capture the full picture.
+3. Share an architectural decision (or code implementation) where AI suggestions wouldn't capture the full picture.
 
 # AI as a Rubber Duck
 <!-- layout: image-left -->
@@ -193,6 +200,50 @@ This is where AI shines: structured, repetitive tasks with clear patterns.
 
 **The difference:** Context, creativity, and trade-off evaluation
 
+# AI as a Consultant
+<!-- layout: image-right -->
+<!-- image: https://images.unsplash.com/photo-1454165804606-c3d57bc86b40?w=1920 -->
+<!-- caption: Photo by Helloquence on Unsplash -->
+
+**Imagine hiring a consultant to improve your system.**
+
+They need to understand:
+1. Your business goals and constraints
+2. Your existing tech stack and architecture
+3. Your design philosophy and values
+4. Your team's capabilities and preferences
+
+**AI is like a consultant with amnesia** - it knows patterns but not your context.
+
+# Giving AI Context
+<!-- layout: two-column -->
+
+## The Industry Response
+
+Work is underway to address these gaps:
+
+**Specification-driven design:**
+- Formal specs that AI can understand
+- Structured requirements and constraints
+
+**Knowledge protocols:**
+- Memory systems for AI agents
+- Context persistence across sessions
+
+<!-- column-break -->
+
+## Organizational Practices
+
+**In-house AI-friendly documentation:**
+- Codified design philosophies
+- Best practices in machine-readable format
+- Architecture decision records (ADRs)
+
+**But:** This still requires human judgment to:
+- Write these specs and docs
+- Decide what's important to document
+- Evaluate AI suggestions against context
+
 # The Architect's Role
 <!-- layout: two-column -->
 
@@ -213,8 +264,6 @@ This is where AI shines: structured, repetitive tasks with clear patterns.
 <!-- column-break -->
 
 ## Strategic Decision-Making
-
-**[INSERT: Decision matrix you performed]**
 
 **Trade-offs I evaluated:**
 - Cost vs complexity
@@ -274,7 +323,7 @@ Together: Better than either alone.
 <!-- image: https://images.unsplash.com/photo-1485827404703-89b55fcc595e?w=1920 -->
 <!-- caption: Photo by Alex Knight on Unsplash -->
 
-**AI augments architects. It doesn't replace them.**
+**AI augments architects. It doesn't replace them. (yet!)**
 
 # Why Architects Remain Essential
 
@@ -366,6 +415,41 @@ Experience the balance firsthand.
 
 **Not "Can AI replace architects?" but "How can architects leverage AI effectively?"**
 
+# Summary: Today's Journey
+<!-- layout: two-column -->
+
+## What We Covered
+
+**Part 1: DevOps & Architecture**
+- The Three Ways of DevOps applied to architecture
+- DORA metrics and performance correlation
+- Loosely coupled architecture enables flow and feedback
+- Architecture impacts business outcomes and employee well-being
+
+**Part 2: Antifragile Systems**
+- System degradation is not inevitable
+- Antifragility: systems that improve through stress
+- Chaos engineering makes antifragility practical
+- Cultural requirements: blameless post-mortems and psychological safety
+
+<!-- column-break -->
+
+## What We Learned
+
+**Part 3: AI & Architecture**
+- AI augments architects, doesn't replace them (yet!)
+- AI knows patterns but lacks context
+- Strategic decisions require human judgment
+- Effective AI collaboration needs clear specifications
+
+**Key Takeaways:**
+- Architecture is a business and human enabler
+- Continuous learning from failures improves systems
+- Small, controlled failures prevent large uncontrolled ones
+- Context and judgment remain uniquely human skills
+
+**Tomorrow:** Apply these concepts in hands-on lab exercises.
+
 # Questions and Discussion
 
 **Let's discuss:**
@@ -392,3 +476,7 @@ Experience the balance firsthand.
 <!-- caption: Photo by Marvin Meyer on Unsplash -->
 
 **The best architectures will come from architects who know how to work with AI, not from AI alone.**
+
+# Survey
+<!-- layout: image-only -->
+<!-- image: https://survey-api.surveynoodle.com/survey/8c34e34c-8def-473e-b8e1-b4044446bfac/qr?url=widget.surveynoodle.com/%7Bsurvey_id%7D -->
